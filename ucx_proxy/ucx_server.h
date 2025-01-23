@@ -6,13 +6,16 @@
 /**
  * ucp context (communication instance)
  * ucp worker (handles communication)
- * ucp listener (listens for connections)
  */
 typedef struct ucx_server {
-    ucp_context_h * ucp_context;
-    ucp_worker_h * ucp_worker;
-    ucp_listener_h * ucp_listener;
+    ucp_context_h ucp_context;
+    ucp_worker_h ucp_worker;
 } ucx_server_t;
+
+typedef struct ucx_connection {
+    volatile ucp_conn_request_h conn_request;
+    ucp_listener_h ucp_listener;
+} ucx_connection_t;
 
 typedef int send_recv_type_t;
 
