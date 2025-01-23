@@ -7,6 +7,8 @@
 
 #include "ucx_server.h"
 
+#define CLIENT_SERVER_SEND_RECV_AM UCS_BIT(2)
+
 /**
  * Handles a request to the server. Callback function. In this simple 
  * client-server model, the server does not do anything except send ok. Later
@@ -43,10 +45,20 @@ int init_worker(ucx_server_t *server)
 
     memset(&worker_params, 0, sizeof(worker_params));
 
+    // worker uses single thread mode
     worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
-    worker_params.thread_mod = UCS_THREAD_MODE_SINGLE;
+    worker_params.thread_mode = UCS_THREAD_MODE_SINGLE;
 
-    status = ucp_worker_create(server->ucp_context, &worker_params, &server->ucp_worker);
+    // allocate worker space
+    server->ucp_worker = malloc(sizeof(ucp_worker_h));
+    if (server->ucp_worker == NULL) {
+        fprintf(stderr, "malloc failed\n");
+        ret = -1;
+        return ret;
+    }
+
+    // create worker using ucp
+    status = ucp_worker_create(*(server->ucp_context), &worker_params, server->ucp_worker);
     if (status != UCS_OK) {
         fprintf(stderr, "failed ucp_worker_create\n");
         ret = -1;
@@ -61,22 +73,32 @@ int init_worker(ucx_server_t *server)
 int ucx_server_init(ucx_server_t *server) 
 {
     ucp_params_t ucp_params;
-    ucp_status_t status;
+    ucs_status_t status;
     int ret = 0;
 
     memset(&ucp_params, 0, sizeof(ucp_params));
 
     // feature types: TAG, STREAM, RMA, AM -> AM for this server
-    params.field_mask = UCP_PARAM_FIELD_FEATURES;
-    params.features = UCP_FEATURE_AM;
+    ucp_params.field_mask = UCP_PARAM_FIELD_FEATURES;
+    ucp_params.features = UCP_FEATURE_AM;
 
-    status = ucp_init(&params, NULL, &server->ucp_context);
-    if (status != UCS_OK) {
-        fprintf(stderr, "failed to initialize ucp context");
+    // allocate context space
+    server->ucp_context = malloc(sizeof(ucp_context_h));
+    if (server->ucp_context == NULL) {
+        fprintf(stderr, "malloc failed\n");
         ret = -1;
         return ret;
     }
 
+    // initialize context using ucp
+    status = ucp_init(&ucp_params, NULL, server->ucp_context);
+    if (status != UCS_OK) {
+        fprintf(stderr, "failed ucp_init");
+        ret = -1;
+        return ret;
+    }
+
+    // initalize worker 
     ret = init_worker(server);
     if (ret != 0) {
         ucx_server_cleanup(server);
@@ -91,15 +113,15 @@ int ucx_server_init(ucx_server_t *server)
  */
 int ucx_server_listen(ucx_server_t *server, const char *ip, int port)
 {
-
+    return 0;
 }
 
 /**
  * Runs the UCX event loop to process messages.
  */
-void ucx_server_run(ucx_server_t *server, send_recv_type_t send_recv_type)
+int ucx_server_run(ucx_server_t *server, send_recv_type_t send_recv_type)
 {
-    
+    return 0;
 }
 
 /**
@@ -110,30 +132,35 @@ void ucx_server_cleanup(ucx_server_t *server)
 {
     // worker may not have been initialized (incorrect context initialization)
     if (server->ucp_worker != NULL) {
-        ucp_worker_destroy(server->ucp_worker);
+        ucp_worker_destroy(*(server->ucp_worker));
+        free(server->ucp_worker);
     }
-    ucp_cleanup(server->ucp_context);
+    // cleanup context using ucp, free space
+    ucp_cleanup(*(server->ucp_context));
+    free(server->ucp_context);
 }
 
 int main(int argc, char **argv) 
 {   
-    // Active Message communication choosen
+    // Active Message communication choosen    
     send_recv_type_t send_recv_type = CLIENT_SERVER_SEND_RECV_AM;
-    char *listen_addr = NULL;
+    // char *listen_addr = NULL;
     int ret;
 
     ucx_server_t server;
-    memset(server, 0, sizeof(ucx_server_t));
+    server.ucp_context = NULL;
+    server.ucp_worker = NULL;
+    server.ucp_listener = NULL;
 
     // parse inputs
 
-    ret = ucx_server_init(&server, send_recv_type);
+    ret = ucx_server_init(&server);
     if (ret != 0) {
         return ret;
     }
 
-    ret = ucx_server_run(server, send_recv_type);
-    ucx_server_cleanup(server);
+    ret = ucx_server_run(&server, send_recv_type);
+    ucx_server_cleanup(&server);
 
     return ret;
 }
