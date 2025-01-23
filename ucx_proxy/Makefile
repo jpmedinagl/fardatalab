@@ -1,6 +1,7 @@
-FLAGS := -Wall --std=gnu99 -I/home/juanpmg/ucx-install/include
+FLAGS := -Wall --std=gnu99 -I/home/neptune/csc494/ucx-install/include
 PORT := port.mk
 TARGETS := ucx_server ucx_client
+LIBS := -L/home/neptune/csc494/ucx-install/lib -lucp -lucm
 
 debug: FLAGS += -ggdb3 -DDEBUG
 debug: all
@@ -11,10 +12,10 @@ release: all
 all: $(PORT) $(TARGETS)
 
 ucx_server: ucx_server.o
-	gcc $(FLAGS) -o $@ $^
+	gcc $(FLAGS) -o $@ $^ $(LIBS)
 
 ucx_client: ucx_client.o
-	gcc $(FLAGS) -o $@ $^
+	gcc $(FLAGS) -o $@ $^ $(LIBS)
 
 %.o: %.c %.h 
 	gcc $(FLAGS) -c $< -o $@
