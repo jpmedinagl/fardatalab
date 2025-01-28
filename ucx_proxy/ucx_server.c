@@ -6,49 +6,17 @@
 #include <stdlib.h>    /* atoi */
 
 #include "ucx_server.h"
+#include "ucx_util.h"
 
 #define IP_STRING_LEN 16
 #define PORT_STRING_LEN 8
 
+#define AM_ID 0
+
 #define CLIENT_SERVER_SEND_RECV_AM UCS_BIT(2)
+#define send_recv_type CLIENT_SERVER_SEND_RECV_AM;
 
-static struct {
-    volatile int complete;
-    int          is_rndv;
-    void         *desc;
-    void         *recv_buf;
-} am_data_desc = {0, 0, NULL, NULL};
-
-char * sockaddr_get_ip_str(const struct sockaddr_storage *sock_addr,
-                           char *ip_str, size_t max_size)
-{
-    struct sockaddr_in addr_in;    
-    memcpy(&addr_in, sock_addr, sizeof(struct sockaddr_in));
-    inet_ntop(AF_INET, &addr_in.sin_addr, ip_str, max_size);
-    return ip_str;
-}
-
-char * sockaddr_get_port_str(const struct sockaddr_storage *sock_addr,
-                             char *port_str, size_t max_size)
-{
-    struct sockaddr_in addr_in;
-
-    memcpy(&addr_in, sock_addr, sizeof(struct sockaddr_in));
-    snprintf(port_str, max_size, "%d", ntohs(addr_in.sin_port));
-    return port_str;
-}
-
-void set_sock_addr(struct sockaddr_storage *saddr)
-{
-    struct sockaddr_in * sa_in;
-
-    memset(saddr, 0, sizeof(*saddr));
-
-    sa_in = (struct sockaddr_in*)saddr;
-    sa_in->sin_addr.s_addr = INADDR_ANY;
-    sa_in->sin_family = AF_INET;
-    sa_in->sin_port = htons(DEFAULT_PORT);
-}
+static int connection_closed = 1;
 
 /**
  * Initialize the worker for this server. We are using a single thread to 
@@ -188,10 +156,156 @@ ucs_status_t start_server(ucx_server_t *server, ucx_connection_t *connection, uc
     return status;
 }
 
+ucs_status_t ucp_am_data_cb(void *arg, const void *header, size_t header_length,
+                               void *data, size_t length,
+                               const ucp_am_recv_param_t *param)
+{
+    (void)header;
+    (void)header_length;
+
+    // Assuming the data is the path received from the client
+    char *path = (char*)data;
+    printf("Server received path: %s\n", path);
+
+    // Prepare the success message and path to send back
+    char response[1024];
+    snprintf(response, sizeof(response), "Success: Path received - %s", path);
+
+    // Assuming you have a valid endpoint `ep` stored or passed to the function
+    ucp_ep_h ep = (ucp_ep_h)arg; // or however you manage the endpoint
+
+    // Send the response back using AM
+    ucs_status_t status = ucp_am_send_data_nbx(ucp_worker, ep, AM_ID, response, strlen(response) + 1);
+    if (status != UCS_OK) {
+        fprintf(stderr, "Failed to send AM message: %s\n", ucs_status_string(status));
+        return UCS_ERR_IO_ERROR;
+    }
+
+    return UCS_OK;
+}
+
+
+// ucs_status_t ucp_am_data_cb(void *arg, const void *header, size_t header_length,
+//                             void *data, size_t length,
+//                             const ucp_am_recv_param_t *param)
+// {
+//     if (length == 0) {
+//         fprintf(stderr, "Received empty data.\n");
+//         return UCS_ERR_INVALID_PARAM;
+//     }
+
+//     // Here, we assume `data` is the path sent by the client
+//     char *received_path = (char *)data;
+//     received_path[length] = '\0';  // Null-terminate the string
+
+//     printf("Received path: %s\n", received_path);
+
+//     // Process the path as needed
+//     // For example, you can open a file or send a response based on the path
+
+//     // char *response = fetch_data_from_university(received_path);
+
+//     // // Send the fetched data back to the client
+//     // ucp_am_send_data(arg, AM_ID, response, strlen(response));
+
+//     // // Clean up and free memory
+//     // free(response);
+
+
+//     // Prepare the success message and path to send back
+//     char response[1024];
+//     snprintf(response, sizeof(response), "Success: Path received - %s", received_path);
+
+//     // Send the success message back to the client
+//     ucp_worker_h ucp_worker = (ucp_worker_h)arg;  // Cast back the worker
+
+//     // Send the response back using AM
+//     ucs_status_t status = ucp_am_send_data_nbx(ucp_worker, param->recv_ep, AM_ID, response, strlen(response) + 1);
+//     if (status != UCS_OK) {
+//         fprintf(stderr, "Failed to send AM message: %s\n", ucs_status_string(status));
+//         return UCS_ERR_IO_ERROR;
+//     }
+
+//     return UCS_OK;
+// }
+
+ucs_status_t register_am_recv_callback(ucp_worker_h worker)
+{
+    ucp_am_handler_param_t param;
+
+    param.field_mask = UCP_AM_HANDLER_PARAM_FIELD_ID |
+                       UCP_AM_HANDLER_PARAM_FIELD_CB |
+                       UCP_AM_HANDLER_PARAM_FIELD_ARG;
+    param.id         = AM_ID;
+    param.cb         = ucp_am_data_cb;
+    param.arg        = worker; // don't need worker when receiving the initial path
+
+    return ucp_worker_set_am_recv_handler(worker, &param);
+}
+
+void err_cb(void *arg, ucp_ep_h ep, ucs_status_t status)
+{
+    printf("error handling callback was invoked with status %d (%s)\n",
+           status, ucs_status_string(status));
+    connection_closed = 1;
+}
+
+ucs_status_t server_create_ep(ucp_worker_h data_worker,
+                                     ucp_conn_request_h conn_request,
+                                     ucp_ep_h *server_ep)
+{
+    ucp_ep_params_t ep_params;
+    ucs_status_t    status;
+
+    /* Server creates an ep to the client on the data worker.
+     * This is not the worker the listener was created on.
+     * The client side should have initiated the connection, leading
+     * to this ep's creation */
+    ep_params.field_mask      = UCP_EP_PARAM_FIELD_ERR_HANDLER |
+                                UCP_EP_PARAM_FIELD_CONN_REQUEST;
+    ep_params.conn_request    = conn_request;
+    ep_params.err_handler.cb  = err_cb;
+    ep_params.err_handler.arg = NULL;
+
+    status = ucp_ep_create(data_worker, &ep_params, server_ep);
+    if (status != UCS_OK) {
+        fprintf(stderr, "failed to create an endpoint on the server: (%s)\n",
+                ucs_status_string(status));
+    }
+
+    return status;
+}
+
+int server_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep)
+{
+    int ret = 0;
+    ucs_status_t status;
+
+    // For the server, register the AM callback for receiving messages (paths)
+    status = register_am_recv_callback(ucp_worker);
+    if (status != UCS_OK) {
+        fprintf(stderr, "Failed to register AM callback.\n");
+        ret = -1;
+        goto out;
+    }
+
+    // Main loop to keep the server running and handle client messages
+    while (!connection_closed) {
+        // Process incoming events (non-blocking)
+        ucp_worker_progress(ucp_worker);
+    }
+
+    // Once connection is closed, handle any cleanup
+    printf("Server connection closed.\n");
+
+out:
+    return ret;
+}
+
 /**
  * Runs the UCX event loop to process messages.
  */
-int ucx_server_run(ucx_server_t *server, send_recv_type_t send_recv_type)
+int ucx_server_run(ucx_server_t *server)
 {   
     ucx_connection_t connection;
     ucp_worker_h ucp_data_worker;
@@ -229,7 +343,7 @@ int ucx_server_run(ucx_server_t *server, send_recv_type_t send_recv_type)
             return -1;
         }
 
-        ret = client_server_do_work(ucp_data_worker, server_ep, send_recv_type, 1);
+        ret = server_do_work(ucp_data_worker, server_ep);
         if (ret != UCS_OK) {
             // CLEANUP
             return -1;
@@ -260,22 +374,19 @@ void ucx_server_cleanup(ucx_server_t *server)
     free(server);
 }
 
-int main(int argc, char **argv) 
+int main(int argc, char **argv)
 {   
-    // Active Message communication choosen    
-    send_recv_type_t send_recv_type = CLIENT_SERVER_SEND_RECV_AM;
+    // Active Message communication choosen
     int ret;
 
     ucx_server_t server;
-
-    // parse inputs
 
     ret = ucx_server_init(&server);
     if (ret != 0) {
         return ret;
     }
 
-    ret = ucx_server_run(&server, send_recv_type);
+    ret = ucx_server_run(&server);
     ucx_server_cleanup(&server);
 
     return ret;

@@ -17,8 +17,6 @@ typedef struct ucx_connection {
     ucp_listener_h ucp_listener;
 } ucx_connection_t;
 
-typedef int send_recv_type_t;
-
 /**
  * Initializes the UCX server by setting up context and worker.
  * Returns 0 on success, non-zero on failure.
@@ -34,7 +32,7 @@ int ucx_server_listen(ucx_server_t *server, const char *ip, int port);
 /**
  * Runs the UCX event loop to process messages.
  */
-int ucx_server_run(ucx_server_t *server, send_recv_type_t send_recv_type);
+int ucx_server_run(ucx_server_t *server);
 
 /**
  * Cleans up UCX resources.
