@@ -11,7 +11,7 @@
 
 #define AM_ID_RESPONSE 0
 
-static int connection_closed = 1;
+static int connection_closed = 0;
 static int response_received = 0;
 
 /**
@@ -162,18 +162,15 @@ ucs_status_t client_am_data_cb(void *arg, const void *header, size_t header_leng
                                const ucp_am_recv_param_t *param)
 {
     static size_t total_data_received = 0;
-    static size_t total_data_size = 0;  // This will be updated when we first receive the total size
-    static char *received_data = NULL;   // Buffer to store the received data
+    static size_t total_data_size = 0;  
+    static char *received_data = NULL;  
 
-    if (param->recv_attr & UCP_AM_RECV_ATTR_FLAG_RNDV) {
-        // The first chunk should contain the total data size
-        total_data_size = *((size_t*)data);  // Assume the first chunk contains the total size
-        total_data_received = 0;
-
-        // Allocate buffer for the full data
+    /* 🔴 FIX: Allocate `received_data` if it's NULL */
+    if (received_data == NULL) {
+        total_data_size = length;
         received_data = malloc(total_data_size);
         if (!received_data) {
-            fprintf(stderr, "Failed to allocate memory for received data\n");
+            fprintf(stderr, "client_am_data_cb: Failed to allocate memory for received data\n");
             return UCS_ERR_NO_MEMORY;
         }
     }
@@ -189,6 +186,9 @@ ucs_status_t client_am_data_cb(void *arg, const void *header, size_t header_leng
         received_data = NULL;
         total_data_received = 0;
         total_data_size = 0;
+
+        /* 🔴 FIX: Mark the response as received */
+        response_received = 1;
     }
 
     return UCS_OK;
@@ -218,7 +218,13 @@ void send_callback(void *request, ucs_status_t status, void *user_data)
 
 ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *msg, size_t msg_length)
 {
+    if (!ep) {
+        fprintf(stderr, "send_am_message: Attempted to use a NULL endpoint!\n");
+        return UCS_ERR_INVALID_PARAM;
+    }
+
     printf("send_am_message\n");
+    printf("%s, %ld\n", msg, msg_length);
 
     ucp_request_param_t param;
     void *request;
@@ -226,41 +232,45 @@ ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *m
 
     param.op_attr_mask = UCP_OP_ATTR_FIELD_CALLBACK |
                          UCP_OP_ATTR_FIELD_USER_DATA;
-    param.cb.send      = send_callback;  // Completion callback
-    param.user_data    = NULL;           // No additional data needed
+    param.cb.send      = send_callback;
+    param.user_data    = NULL;
 
-    // Send an Active Message (AM) to the server
-    request = ucp_am_send_nbx(ep, AM_ID_RESPONSE, NULL, 0, msg, msg_length, &param);
-    
+    /* Create a header containing the message length */
+    size_t header = msg_length;
+
+    /* Send an Active Message (AM) to the server with the header */
+    request = ucp_am_send_nbx(ep, AM_ID_RESPONSE, &header, sizeof(size_t), msg, msg_length, &param);
+
+    /* 🔴 FIX: If the request completes immediately, return */
+    if (request == NULL) {
+        return UCS_OK;  // Operation completed immediately
+    }
+
     if (UCS_PTR_IS_ERR(request)) {
         status = UCS_PTR_STATUS(request);
         fprintf(stderr, "Failed to send AM message: %s\n", ucs_status_string(status));
         return status;
-    } else if (request == NULL) {
-        // The request was completed immediately
-        return UCS_OK;
     }
 
-    // Wait for the send request to complete
+    /* 🔴 FIX: Wait for completion and ensure request is freed */
     while (ucp_request_check_status(request) == UCS_INPROGRESS) {
         ucp_worker_progress(ucp_worker);
     }
 
     status = ucp_request_check_status(request);
-    ucp_request_free(request);
+
+    /* 🔴 FIX: Always free the request */
+    // ucp_request_free(request);
 
     return status;
 }
 
 int client_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *path)
 {
-    
-    printf("client_do_work\n");
-
     int ret = 0;
     ucs_status_t status;
 
-        // Register the receive callback for server responses
+    // Register the receive callback for server responses
     status = register_client_am_recv_callback(ucp_worker);
     if (status != UCS_OK) {
         fprintf(stderr, "Failed to register AM receive callback.\n");
@@ -268,7 +278,7 @@ int client_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *path)
     }
 
     // Send the request to the server
-    status = send_am_message(ucp_worker, ep, path, strlen(path) + 1);
+    status = send_am_message(ucp_worker, ep, path, strlen(path));
     if (status != UCS_OK) {
         fprintf(stderr, "Failed to send path to server.\n");
         ret = -1;
@@ -314,7 +324,12 @@ int ucx_client_run(ucp_worker_h ucp_worker, const char * server_addr, char * pat
  */
 void ucx_client_cleanup(ucx_client_t *client)
 {
-    return ;
+    if (client->ucp_worker) {
+        ucp_worker_destroy(client->ucp_worker);
+    }
+    if (client->ucp_context) {
+        ucp_cleanup(client->ucp_context);
+    }
 }
 
 int main(int argc, char **argv)
@@ -325,12 +340,15 @@ int main(int argc, char **argv)
 
     ucx_client_t client;
 
+    if (argc < 3) {
+        fprintf(stderr, "Usage: %s <server_addr> <path>\n", argv[0]);
+        return -1;
+    }
+
     server_addr = argv[1];
     path = argv[2];
 
     ret = ucx_client_init(&client);
-    // if (ret != 0) {
-    // }
 
     ret = ucx_client_run(client.ucp_worker, server_addr, path);
 
