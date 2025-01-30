@@ -18,20 +18,6 @@
 
 static int connection_closed = 1;
 
-typedef struct {
-    int complete;          /* Indicates whether the message processing is complete */
-    size_t path_length;    /* Length of the received path */
-    char path[1024];       /* Buffer to store the received path */
-} am_data_desc_t;
-
-typedef struct {
-    ucp_ep_h ep;           /* Endpoint for this connection */
-    am_data_desc_t am_data; /* Per-connection data */
-} connection_data_t;
-
-// /* Global instance of the structure */
-// am_data_desc_t am_data_desc = {0};
-
 /**
  * Initialize the worker for this server. We are using a single thread to 
  * process incoming requests.
@@ -112,6 +98,7 @@ void server_conn_handle_cb(ucp_conn_request_h conn_request, void *arg)
         printf("Server received a connection request from client at address %s:%s\n",
                sockaddr_get_ip_str(&attr.client_address, ip_str, sizeof(ip_str)),
                sockaddr_get_port_str(&attr.client_address, port_str, sizeof(port_str)));
+        
     } else if (status != UCS_ERR_UNSUPPORTED) {
         fprintf(stderr, "failed to query the connection request\n");
         return ;
@@ -123,22 +110,12 @@ void server_conn_handle_cb(ucp_conn_request_h conn_request, void *arg)
         /* The server is already handling a connection request from a client,
          * reject this new one */
         printf("Rejecting a connection request. Only one client at a time is supported.\n");
+        
         status = ucp_listener_reject(connection->ucp_listener, conn_request);
         if (status != UCS_OK) {
             fprintf(stderr, "server failed to reject a connection request\n");
         }
     }
-
-    /* Clean up resources before processing the next connection */
-    // if (connection->ucp_listener != NULL) {
-    //     ucp_listener_destroy(connection->ucp_listener);
-    //     connection->ucp_listener = NULL;
-    // }
-
-    // if (connection->conn_request != NULL) {
-    //     ucp_request_release(connection->conn_request);
-    //     connection->conn_request = NULL;
-    // }
 }
 
 ucs_status_t start_server(ucx_server_t *server, ucx_connection_t *connection, ucp_listener_h *listener_p)
@@ -178,7 +155,9 @@ ucs_status_t start_server(ucx_server_t *server, ucx_connection_t *connection, uc
             sockaddr_get_ip_str(&attr.sockaddr, ip_str, IP_STRING_LEN),
             sockaddr_get_port_str(&attr.sockaddr, port_str, PORT_STRING_LEN));
 
-    printf("Waiting for connection...\n");
+    printf("\n\nWaiting for connection...\n");
+    printf("----------------------------------------------------\n");
+    
 
     return UCS_OK;
 }
@@ -196,8 +175,6 @@ ucs_status_t server_create_ep(ucp_worker_h data_worker,
 {
     ucp_ep_params_t ep_params;
     ucs_status_t    status;
-    
-    printf("server_create_ep\n");
 
     memset(&ep_params, 0, sizeof(ep_params));
 
@@ -246,7 +223,7 @@ ucs_status_t ucp_am_data_cb(void *arg, const void *header, size_t header_length,
     /* Store the received path */
     memcpy(conn_data->am_data.path, data, conn_data->am_data.path_length);
     conn_data->am_data.path[conn_data->am_data.path_length] = '\0'; // Null-terminate the string
-    printf("Received path: %s %ld\n", conn_data->am_data.path, conn_data->am_data.path_length);
+    printf("\nReceived data: %s (%ld)\n", conn_data->am_data.path, conn_data->am_data.path_length);
 
     /* Mark the operation as complete */
     conn_data->am_data.complete = 1;
@@ -331,6 +308,9 @@ int server_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, connection_data_t *conn
 
     if (conn_data->am_data.complete) {
         /* Send the received path back to the client */
+
+        printf("Sending data: %s (%ld)\n", conn_data->am_data.path, conn_data->am_data.path_length);
+
         status = send_data_back(ucp_worker, ep, conn_data);
         if (status != UCS_OK) {
             fprintf(stderr, "Failed to send data back to client.\n");
@@ -342,10 +322,6 @@ int server_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, connection_data_t *conn
     while (ucp_worker_progress(ucp_worker)) {
         // Wait for all operations to complete
     }
-
-    ep_close(ucp_worker, ep, UCP_EP_CLOSE_FLAG_FORCE);
-
-    memset(&conn_data->am_data, 0, sizeof(am_data_desc_t));
 
     connection_closed = 1;
 
@@ -380,13 +356,15 @@ int ucx_server_run(ucx_server_t *server)
         return -1;
     }
 
+    memset(&server_ep, 0, sizeof(server_ep));
+    memset(&conn_data.am_data, 0, sizeof(am_data_desc_t));
+
     while (1) {
         while (connection.conn_request == NULL) {
             ucp_worker_progress(server->ucp_worker);
         }
 
         // Reset connection data for the new client
-        memset(&conn_data, 0, sizeof(connection_data_t));
 
         status = server_create_ep(ucp_data_worker, connection.conn_request, &server_ep);
         if (status != UCS_OK) {
@@ -408,11 +386,17 @@ int ucx_server_run(ucx_server_t *server)
 
         ret = server_do_work(ucp_data_worker, server_ep, &conn_data);
 
-        // Clean up the endpoint and reset the connection request
-        // ep_close(ucp_data_worker, server_ep, UCP_EP_CLOSE_FLAG_FORCE);
+        // Close end-point clean-up connection data
+        ep_close(ucp_data_worker, server_ep, UCP_EP_CLOSE_FLAG_FORCE);
+
+        memset(&conn_data.am_data, 0, sizeof(am_data_desc_t));
+
+        // Reset the connection request
         connection.conn_request = NULL;
 
-        printf("Waiting for connection...\n");
+        printf("\n\nWaiting for connection...\n");
+        printf("----------------------------------------------------\n");
+        
     }
     
     ucp_worker_destroy(ucp_data_worker);
@@ -421,7 +405,7 @@ int ucx_server_run(ucx_server_t *server)
 }
 
 /**
- * Cleans up UCX resources. Cleans up both the ucp context as well as the ucp 
+ * Cleans up ucx resources. Cleans up both the ucp context as well as the ucp 
  * worker servicing the context.
  */
 void ucx_server_cleanup(ucx_server_t *server) 
@@ -437,17 +421,19 @@ void ucx_server_cleanup(ucx_server_t *server)
 
 int main(int argc, char **argv)
 {   
-    // Active Message communication choosen
-    int ret;
-
     ucx_server_t server;
+    int ret;
 
     ret = ucx_server_init(&server);
     if (ret != 0) {
+        // failed to initialize the server correctly -> clean up is handled in the init
         return ret;
     }
 
+    // run server
     ret = ucx_server_run(&server);
+
+    // cleanup server - technically we have an infinite while loop, but good practice
     ucx_server_cleanup(&server);
 
     return ret;
