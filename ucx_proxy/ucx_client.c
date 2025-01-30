@@ -52,7 +52,7 @@ int ucx_client_init(ucx_client_t *client)
 
     memset(&ucp_params, 0, sizeof(ucp_params));
 
-    // feature types: TAG, STREAM, RMA, AM -> AM for this server
+    // feature types: TAG, STREAM, RMA, AM -> AM
     ucp_params.field_mask = UCP_PARAM_FIELD_FEATURES;
     ucp_params.features = UCP_FEATURE_AM;
 
@@ -218,6 +218,8 @@ void send_callback(void *request, ucs_status_t status, void *user_data)
 
 ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *msg, size_t msg_length)
 {
+    printf("send_am_message\n");
+
     ucp_request_param_t param;
     void *request;
     ucs_status_t status;
@@ -252,6 +254,9 @@ ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *m
 
 int client_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *path)
 {
+    
+    printf("client_do_work\n");
+
     int ret = 0;
     ucs_status_t status;
 
@@ -320,14 +325,8 @@ int main(int argc, char **argv)
 
     ucx_client_t client;
 
-    parse_cmd_status = parse_cmd(argc, argv, &server_addr, &path);
-    // if (parse_cmd_status == PARSE_CMD_STATUS_PRINT_HELP) {
-    //     ret = 0;
-    //     goto err;
-    // } else if (parse_cmd_status == PARSE_CMD_STATUS_ERROR) {
-    //     ret = -1;
-    //     goto err;
-    // }
+    server_addr = argv[1];
+    path = argv[2];
 
     ret = ucx_client_init(&client);
     // if (ret != 0) {

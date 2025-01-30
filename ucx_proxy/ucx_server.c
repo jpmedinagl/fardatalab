@@ -18,6 +18,15 @@
 
 static int connection_closed = 1;
 
+typedef struct {
+    int complete;          /* Indicates whether the message processing is complete */
+    size_t path_length;    /* Length of the received path */
+    char path[1024];       /* Buffer to store the received path */
+} am_data_desc_t;
+
+/* Global instance of the structure */
+am_data_desc_t am_data_desc = {0};
+
 /**
  * Initialize the worker for this server. We are using a single thread to 
  * process incoming requests.
@@ -156,34 +165,6 @@ ucs_status_t start_server(ucx_server_t *server, ucx_connection_t *connection, uc
     return status;
 }
 
-ucs_status_t ucp_am_data_cb(void *arg, const void *header, size_t header_length,
-                               void *data, size_t length,
-                               const ucp_am_recv_param_t *param)
-{
-    (void)header;
-    (void)header_length;
-
-    // Assuming the data is the path received from the client
-    char *path = (char*)data;
-    printf("Server received path: %s\n", path);
-
-    // Prepare the success message and path to send back
-    char response[1024];
-    snprintf(response, sizeof(response), "Success: Path received - %s", path);
-
-    // Assuming you have a valid endpoint `ep` stored or passed to the function
-    ucp_ep_h ep = (ucp_ep_h)arg; // or however you manage the endpoint
-
-    // Send the response back using AM
-    ucs_status_t status = ucp_am_send_data_nbx(ucp_worker, ep, AM_ID, response, strlen(response) + 1);
-    if (status != UCS_OK) {
-        fprintf(stderr, "Failed to send AM message: %s\n", ucs_status_string(status));
-        return UCS_ERR_IO_ERROR;
-    }
-
-    return UCS_OK;
-}
-
 
 // ucs_status_t ucp_am_data_cb(void *arg, const void *header, size_t header_length,
 //                             void *data, size_t length,
@@ -229,19 +210,6 @@ ucs_status_t ucp_am_data_cb(void *arg, const void *header, size_t header_length,
 //     return UCS_OK;
 // }
 
-ucs_status_t register_am_recv_callback(ucp_worker_h worker)
-{
-    ucp_am_handler_param_t param;
-
-    param.field_mask = UCP_AM_HANDLER_PARAM_FIELD_ID |
-                       UCP_AM_HANDLER_PARAM_FIELD_CB |
-                       UCP_AM_HANDLER_PARAM_FIELD_ARG;
-    param.id         = AM_ID;
-    param.cb         = ucp_am_data_cb;
-    param.arg        = worker; // don't need worker when receiving the initial path
-
-    return ucp_worker_set_am_recv_handler(worker, &param);
-}
 
 void err_cb(void *arg, ucp_ep_h ep, ucs_status_t status)
 {
@@ -256,6 +224,8 @@ ucs_status_t server_create_ep(ucp_worker_h data_worker,
 {
     ucp_ep_params_t ep_params;
     ucs_status_t    status;
+    
+    printf("server_create_ep\n");
 
     /* Server creates an ep to the client on the data worker.
      * This is not the worker the listener was created on.
@@ -276,8 +246,96 @@ ucs_status_t server_create_ep(ucp_worker_h data_worker,
     return status;
 }
 
+ucs_status_t ucp_am_data_cb(void *arg, const void *header, size_t header_length,
+                            void *data, size_t length,
+                            const ucp_am_recv_param_t *param)
+{
+    printf("ucp_am_data_cb\n");
+
+    /* Validate the header */
+    if (header_length != sizeof(size_t)) {
+        fprintf(stderr, "Received wrong header length %ld (expected %ld)\n",
+                header_length, sizeof(size_t));
+        return UCS_OK;
+    }
+
+    /* Extract the path length from the header */
+    am_data_desc.path_length = *(size_t *)header;
+
+    /* Validate the data length */
+    if (length != am_data_desc.path_length) {
+        fprintf(stderr, "Received wrong data length %ld (expected %ld)\n",
+                length, am_data_desc.path_length);
+        return UCS_OK;
+    }
+
+    /* Store the received path */
+    memcpy(am_data_desc.path, data, am_data_desc.path_length);
+    am_data_desc.path[am_data_desc.path_length] = '\0'; // Null-terminate the string
+    printf("Received path: %s\n", am_data_desc.path);
+
+    /* Mark the operation as complete */
+    am_data_desc.complete++;
+
+    return UCS_OK;
+}
+
+ucs_status_t register_am_recv_callback(ucp_worker_h worker)
+{
+    ucp_am_handler_param_t param;
+
+    printf("register_am_recv_callback\n");
+
+    param.field_mask = UCP_AM_HANDLER_PARAM_FIELD_ID |
+                       UCP_AM_HANDLER_PARAM_FIELD_CB |
+                       UCP_AM_HANDLER_PARAM_FIELD_ARG;
+    param.id         = AM_ID;
+    param.cb         = ucp_am_data_cb;
+    param.arg        = worker; // don't need worker when receiving the initial path
+
+    return ucp_worker_set_am_recv_handler(worker, &param);
+}
+
+ucs_status_t send_data_back(ucp_worker_h worker, ucp_ep_h ep)
+{
+    
+    printf("send_data_back\n");
+
+    ucs_status_ptr_t status_ptr;
+    ucs_status_t status;
+
+    if (am_data_desc.path_length == 0) {
+        fprintf(stderr, "No data to send.\n");
+        return UCS_ERR_INVALID_PARAM;
+    }
+
+    printf("Sending path back to client: %s\n", am_data_desc.path);
+
+    status_ptr = ucp_am_send_nb(
+        ep, 
+        AM_ID,                            // Active Message ID
+        am_data_desc.path,                // Data buffer
+        am_data_desc.path_length,         // Data size
+        ucp_dt_make_contig(1),            // Contiguous data type
+        NULL,                             // No callback function
+        0                                 // No special flags
+    );
+
+    if (UCS_PTR_IS_ERR(status_ptr)) {
+        status = UCS_PTR_STATUS(status_ptr);
+        fprintf(stderr, "Failed to send data back: %s\n", ucs_status_string(status));
+        return status;
+    }
+
+    return UCS_OK;
+}
+
+
 int server_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep)
 {
+    
+    printf("server_do_work\n");
+
     int ret = 0;
     ucs_status_t status;
 
@@ -286,19 +344,32 @@ int server_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep)
     if (status != UCS_OK) {
         fprintf(stderr, "Failed to register AM callback.\n");
         ret = -1;
-        goto out;
+        return ret;
     }
 
     // Main loop to keep the server running and handle client messages
     while (!connection_closed) {
         // Process incoming events (non-blocking)
         ucp_worker_progress(ucp_worker);
+
+        // Check if a message has been received and processed
+        // if (am_data_desc.complete) {
+        //     // Send the same path back to the client
+        //     status = send_data_back(ucp_worker, ep);
+        //     if (status != UCS_OK) {
+        //         fprintf(stderr, "Failed to send data back to client.\n");
+        //         ret = -1;
+        //         break;
+        //     }
+
+        //     // Reset the completion flag
+        //     am_data_desc.complete = 0;
+        // }
     }
 
     // Once connection is closed, handle any cleanup
     printf("Server connection closed.\n");
 
-out:
     return ret;
 }
 
@@ -312,6 +383,8 @@ int ucx_server_run(ucx_server_t *server)
     ucp_ep_h server_ep;
     ucs_status_t status;
     int ret;
+    
+    printf("ucx_server_run.\n");
 
     ret = init_worker(server->ucp_context, &ucp_data_worker);
     if (ret != 0) {
