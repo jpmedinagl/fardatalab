@@ -17,6 +17,17 @@ typedef struct ucx_connection {
     ucp_listener_h ucp_listener;
 } ucx_connection_t;
 
+typedef struct {
+    int complete;          /* Indicates whether the message processing is complete */
+    size_t path_length;    /* Length of the received path */
+    char path[1024];       /* Buffer to store the received path */
+} am_data_desc_t;
+
+typedef struct {
+    ucp_ep_h ep;           /* Endpoint for this connection */
+    am_data_desc_t am_data; /* Per-connection data */
+} connection_data_t;
+
 /**
  * Initializes the UCX server by setting up context and worker.
  * Returns 0 on success, non-zero on failure.
