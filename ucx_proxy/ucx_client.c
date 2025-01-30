@@ -113,6 +113,10 @@ void set_sock_server_addr(const char *address_str, struct sockaddr_storage *sadd
         fprintf(stderr, "Invalid address: %s\n", address_str);
         exit(EXIT_FAILURE);
     }
+
+    printf("client connected to IP %s port %d\n",
+            address_str,
+            DEFAULT_PORT);
 }
 
 ucs_status_t start_client(ucp_worker_h ucp_worker, const char *address_str, ucp_ep_h *client_ep)
@@ -161,33 +165,45 @@ ucs_status_t client_am_data_cb(void *arg, const void *header, size_t header_leng
                                void *data, size_t length,
                                const ucp_am_recv_param_t *param)
 {
-    static size_t total_data_received = 0;
-    static size_t total_data_size = 0;  
-    static char *received_data = NULL;  
+    size_t total_data_received = 0;
+    size_t total_data_size = 0;
+    char *received_data = NULL;
 
-    /* 🔴 FIX: Allocate `received_data` if it's NULL */
-    if (received_data == NULL) {
-        total_data_size = length;
-        received_data = malloc(total_data_size);
+    // The first time we enter the callback, we need to extract the total size
+    if (total_data_size == 0) {
+        // We expect the header to contain the total data size (just like in the server)
+        if (header_length != sizeof(size_t)) {
+            fprintf(stderr, "Received invalid header length %ld\n", header_length);
+            return UCS_ERR_INVALID_PARAM;
+        }
+        
+        total_data_size = *(size_t *)header;  // Get the total data size from the header
+
+        // Allocate memory for the full data we're going to receive
+        received_data = malloc(total_data_size + 1);
         if (!received_data) {
-            fprintf(stderr, "client_am_data_cb: Failed to allocate memory for received data\n");
+            fprintf(stderr, "Failed to allocate memory for received data\n");
             return UCS_ERR_NO_MEMORY;
         }
     }
 
-    // Store received chunk
+    // Copy the incoming chunk of data to the allocated buffer
     memcpy(received_data + total_data_received, data, length);
     total_data_received += length;
 
-    // If all data is received, process it
+    received_data[total_data_size] = '\0';
+
+    // If we've received the full data, process it
     if (total_data_received >= total_data_size) {
-        printf("Client received full data: %s\n", received_data);
+        printf("Received data: %s (%ld)\n", received_data, total_data_size);
+
+        // Clean up after receiving the full data
         free(received_data);
         received_data = NULL;
         total_data_received = 0;
         total_data_size = 0;
 
-        /* 🔴 FIX: Mark the response as received */
+        // Mark the response as fully received (if you have such a flag)
         response_received = 1;
     }
 
@@ -222,9 +238,6 @@ ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *m
         fprintf(stderr, "send_am_message: Attempted to use a NULL endpoint!\n");
         return UCS_ERR_INVALID_PARAM;
     }
-
-    printf("send_am_message\n");
-    printf("%s, %ld\n", msg, msg_length);
 
     ucp_request_param_t param;
     void *request;
@@ -277,6 +290,8 @@ int client_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *path)
         ret = -1;
     }
 
+    printf("\nSent data: %s (%ld)\n", path, strlen(path));
+
     // Send the request to the server
     status = send_am_message(ucp_worker, ep, path, strlen(path));
     if (status != UCS_OK) {
@@ -284,14 +299,12 @@ int client_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *path)
         ret = -1;
     }
 
-    printf("Sent path to server: %s\n", path);
-
     // Wait for a response (if the server sends one)
     while (!response_received) {
         ucp_worker_progress(ucp_worker);
     }
 
-    printf("Received response from server.\n");
+    printf("\nReceived response from server.\n");
 
 // out:
     return ret;
