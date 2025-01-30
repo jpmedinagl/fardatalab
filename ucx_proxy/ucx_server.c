@@ -245,43 +245,61 @@ ucs_status_t register_am_recv_callback(ucp_worker_h worker, connection_data_t *c
     return ucp_worker_set_am_recv_handler(worker, &param);
 }
 
-ucs_status_t send_data_back(ucp_worker_h worker, ucp_ep_h ep, connection_data_t *conn_data)
-{
-    ucs_status_ptr_t status_ptr;
-    ucs_status_t status;
+void send_callback(void *request, ucs_status_t status, void *user_data)
+ {
+    if (status != UCS_OK) {
+        fprintf(stderr, "\nSend operation failed: %s\n", ucs_status_string(status));
+    } else {
+        printf("\nSend operation completed successfully.\n");
+    }
 
-    if (conn_data->am_data.path_length == 0) {
-        fprintf(stderr, "No data to send.\n");
+    // Free the request after completion
+    ucp_request_free(request);
+}
+
+ucs_status_t send_data_back(ucp_worker_h ucp_worker, ucp_ep_h ep, connection_data_t *conn_data)
+{   
+    char * msg = conn_data->am_data.path;
+    size_t msg_length = conn_data->am_data.path_length;
+
+    if (!ep) {
+        fprintf(stderr, "send_am_message: Attempted to use a NULL endpoint!\n");
         return UCS_ERR_INVALID_PARAM;
     }
 
-    printf("Sending path back to client: %s, %ld\n", conn_data->am_data.path, conn_data->am_data.path_length);
+    ucp_request_param_t param;
+    void *request;
+    ucs_status_t status;
 
-    status_ptr = ucp_am_send_nb(
-        ep, 
-        AM_ID,                            // Active Message ID
-        conn_data->am_data.path,          // Data buffer
-        conn_data->am_data.path_length,   // Data size
-        ucp_dt_make_contig(1),            // Contiguous data type
-        NULL,                             // No callback function
-        0                                 // No special flags
-    );
+    param.op_attr_mask = UCP_OP_ATTR_FIELD_CALLBACK |
+                         UCP_OP_ATTR_FIELD_USER_DATA;
+    param.cb.send      = send_callback;
+    param.user_data    = NULL;
 
-    if (UCS_PTR_IS_ERR(status_ptr)) {
-        status = UCS_PTR_STATUS(status_ptr);
-        fprintf(stderr, "Failed to send data back: %s\n", ucs_status_string(status));
+    /* Create a header containing the message length */
+    size_t header = msg_length;
+
+    /* Send an Active Message (AM) to the server with the header */
+    request = ucp_am_send_nbx(ep, AM_ID, &header, sizeof(size_t), msg, msg_length, &param);
+
+    if (request == NULL) {
+        // Operation completed immediately
+        return UCS_OK;
+    }
+
+    if (UCS_PTR_IS_ERR(request)) {
+        status = UCS_PTR_STATUS(request);
+        fprintf(stderr, "Failed to send AM message: %s\n", ucs_status_string(status));
         return status;
     }
 
-    /* Wait for the request to complete */
-    if (status_ptr != NULL) {
-        while (ucp_request_check_status(status_ptr) == UCS_INPROGRESS) {
-            ucp_worker_progress(worker);
-        }
-        ucp_request_free(status_ptr);
+    while (ucp_request_check_status(request) == UCS_INPROGRESS) {
+        ucp_worker_progress(ucp_worker);
     }
 
-    return UCS_OK;
+    status = ucp_request_check_status(request);
+
+    return status;
 }
 
 
