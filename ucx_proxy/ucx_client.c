@@ -74,22 +74,10 @@ int ucx_client_init(ucx_client_t *client)
 }
 
 /**
- * Connects the UCX client to a server at the given IP and port.
- * Returns 0 on success, non-zero on failure.
- */
-int ucx_client_connect(ucx_client_t *client, const char *ip, int port);
-
-/**
  * Sends a message to the server.
  * Returns 0 on success, non-zero on failure.
  */
 int ucx_client_send(ucx_client_t *client, const void *data, size_t length);
-
-/**
- * Receives a message from the server.
- * Returns 0 on success, non-zero on failure.
- */
-int ucx_client_receive(ucx_client_t *client, void *buffer, size_t length);
 
 void err_cb(void *arg, ucp_ep_h ep, ucs_status_t status)
 {
@@ -98,7 +86,7 @@ void err_cb(void *arg, ucp_ep_h ep, ucs_status_t status)
     connection_closed = 1;
 }
 
-void set_sock_server_addr(const char *address_str, struct sockaddr_storage *saddr)
+void set_sock_server_addr(const char *address_str, int port, struct sockaddr_storage *saddr)
 {
     struct sockaddr_in * sa_in;
 
@@ -107,7 +95,7 @@ void set_sock_server_addr(const char *address_str, struct sockaddr_storage *sadd
     sa_in = (struct sockaddr_in*)saddr;
     // sa_in->sin_addr.s_addr = address_str;
     sa_in->sin_family = AF_INET;
-    sa_in->sin_port = htons(DEFAULT_PORT);
+    sa_in->sin_port = htons(port);
 
     if (inet_pton(AF_INET, address_str, &(sa_in->sin_addr)) <= 0) {
         fprintf(stderr, "Invalid address: %s\n", address_str);
@@ -116,16 +104,16 @@ void set_sock_server_addr(const char *address_str, struct sockaddr_storage *sadd
 
     printf("client connected to IP %s port %d\n",
             address_str,
-            DEFAULT_PORT);
+            port);
 }
 
-ucs_status_t start_client(ucp_worker_h ucp_worker, const char *address_str, ucp_ep_h *client_ep)
+ucs_status_t start_client(ucp_worker_h ucp_worker, ucp_ep_h *client_ep, const char *address_str, int port)
 {
     ucp_ep_params_t ep_params;
     struct sockaddr_storage connect_addr;
     ucs_status_t status;
 
-    set_sock_server_addr(address_str, &connect_addr);
+    set_sock_server_addr(address_str, port, &connect_addr);
 
     /*
      * Endpoint field mask bits:
@@ -160,6 +148,22 @@ ucs_status_t start_client(ucp_worker_h ucp_worker, const char *address_str, ucp_
 
     return status;
 }
+
+/**
+ * Connects the UCX client to a server at the given IP and port.
+ * Returns 0 on success, non-zero on failure.
+ */
+int ucx_client_connect(ucx_client_t *client, const char *ip, int port)
+{
+    // return start_client(client->ucp_worker, client->ucp_ep, ip, port);
+    return 0;
+}
+
+/**
+ * Receives a message from the server.
+ * Returns 0 on success, non-zero on failure.
+ */
+int ucx_client_receive(ucx_client_t *client, void *buffer, size_t length);
 
 ucs_status_t client_am_data_cb(void *arg, const void *header, size_t header_length,
                                void *data, size_t length,
@@ -254,7 +258,6 @@ ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *m
     /* Send an Active Message (AM) to the server with the header */
     request = ucp_am_send_nbx(ep, AM_ID_RESPONSE, &header, sizeof(size_t), msg, msg_length, &param);
 
-    /* 🔴 FIX: If the request completes immediately, return */
     if (request == NULL) {
         return UCS_OK;  // Operation completed immediately
     }
@@ -265,15 +268,11 @@ ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *m
         return status;
     }
 
-    /* 🔴 FIX: Wait for completion and ensure request is freed */
     while (ucp_request_check_status(request) == UCS_INPROGRESS) {
         ucp_worker_progress(ucp_worker);
     }
 
     status = ucp_request_check_status(request);
-
-    /* 🔴 FIX: Always free the request */
-    // ucp_request_free(request);
 
     return status;
 }
@@ -310,17 +309,15 @@ int client_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *path)
     return ret;
 }
 
-int ucx_client_run(ucp_worker_h ucp_worker, const char * server_addr, char * path)
+int ucx_client_run(ucp_worker_h ucp_worker, const char * server_addr, int port, char * path)
 {
     ucp_ep_h client_ep;
     ucs_status_t status;
     int ret;
 
-    status = start_client(ucp_worker, server_addr, &client_ep);
+    status = start_client(ucp_worker, &client_ep, server_addr, port);
     if (status != UCS_OK) {
         fprintf(stderr, "failed to start client (%s)\n", ucs_status_string(status));
-        // ret = -1;
-        // goto out;
         return -1;
     }
 
@@ -349,6 +346,7 @@ int main(int argc, char **argv)
 {   
     char * path = NULL;
     char * server_addr = NULL;
+    int port;
     int ret;
 
     ucx_client_t client;
@@ -359,14 +357,14 @@ int main(int argc, char **argv)
     }
 
     server_addr = argv[1];
+    port = DEFAULT_PORT;
     path = argv[2];
 
     ret = ucx_client_init(&client);
 
-    ret = ucx_client_run(client.ucp_worker, server_addr, path);
+    ret = ucx_client_run(client.ucp_worker, server_addr, port, path);
 
-    ucp_worker_destroy(client.ucp_worker);
-    // ucp_cleanup(client->ucp_context);
+    ucp_cleanup(client->ucp_context);
 
     return ret;
 }

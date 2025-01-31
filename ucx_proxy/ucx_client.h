@@ -9,7 +9,7 @@
 typedef struct ucx_client {
     ucp_context_h ucp_context;
     ucp_worker_h ucp_worker;
-    ucp_ep_h ucp_ep;  // Endpoint for communication with the server
+    ucp_ep_h ucp_ep;
 } ucx_client_t;
 
 /**
