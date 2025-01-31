@@ -34,7 +34,7 @@ int ucx_client_send(ucx_client_t *client, const void *data, size_t length);
  * Receives a message from the server.
  * Returns 0 on success, non-zero on failure.
  */
-int ucx_client_receive(ucx_client_t *client, void *buffer, size_t length);
+int ucx_client_receive(ucx_client_t *client);
 
 /**
  * Cleans up UCX resources.

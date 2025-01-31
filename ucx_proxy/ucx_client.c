@@ -59,7 +59,7 @@ int ucx_client_init(ucx_client_t *client)
     // initialize context using ucp
     status = ucp_init(&ucp_params, NULL, &(client->ucp_context));
     if (status != UCS_OK) {
-        fprintf(stderr, "failed ucp_init");
+        fprintf(stderr, "failed ucp_init\n");
         ret = -1;
         return ret;
     }
@@ -72,12 +72,6 @@ int ucx_client_init(ucx_client_t *client)
     
     return ret;
 }
-
-/**
- * Sends a message to the server.
- * Returns 0 on success, non-zero on failure.
- */
-int ucx_client_send(ucx_client_t *client, const void *data, size_t length);
 
 void err_cb(void *arg, ucp_ep_h ep, ucs_status_t status)
 {
@@ -107,28 +101,18 @@ void set_sock_server_addr(const char *address_str, int port, struct sockaddr_sto
             port);
 }
 
-ucs_status_t start_client(ucp_worker_h ucp_worker, ucp_ep_h *client_ep, const char *address_str, int port)
+/**
+ * Connects the UCX client to a server at the given IP and port. Creates an endpoint.
+ * Returns 0 on success, non-zero on failure.
+ */
+int ucx_client_connect(ucx_client_t *client, const char *ip, int port)
 {
     ucp_ep_params_t ep_params;
     struct sockaddr_storage connect_addr;
     ucs_status_t status;
 
-    set_sock_server_addr(address_str, port, &connect_addr);
+    set_sock_server_addr(ip, port, &connect_addr);
 
-    /*
-     * Endpoint field mask bits:
-     * UCP_EP_PARAM_FIELD_FLAGS             - Use the value of the 'flags' field.
-     * UCP_EP_PARAM_FIELD_SOCK_ADDR         - Use a remote sockaddr to connect
-     *                                        to the remote peer.
-     * UCP_EP_PARAM_FIELD_ERR_HANDLING_MODE - Error handling mode - this flag
-     *                                        is temporarily required since the
-     *                                        endpoint will be closed with
-     *                                        UCP_EP_CLOSE_MODE_FORCE which
-     *                                        requires this mode.
-     *                                        Once UCP_EP_CLOSE_MODE_FORCE is
-     *                                        removed, the error handling mode
-     *                                        will be removed.
-     */
     ep_params.field_mask       = UCP_EP_PARAM_FIELD_FLAGS       |
                                  UCP_EP_PARAM_FIELD_SOCK_ADDR   |
                                  UCP_EP_PARAM_FIELD_ERR_HANDLER |
@@ -140,30 +124,16 @@ ucs_status_t start_client(ucp_worker_h ucp_worker, ucp_ep_h *client_ep, const ch
     ep_params.sockaddr.addr    = (struct sockaddr*)&connect_addr;
     ep_params.sockaddr.addrlen = sizeof(connect_addr);
 
-    status = ucp_ep_create(ucp_worker, &ep_params, client_ep);
+    status = ucp_ep_create(client->ucp_worker, &ep_params, &client->ucp_ep);
     if (status != UCS_OK) {
-        fprintf(stderr, "failed to connect to %s (%s)\n", address_str,
+        fprintf(stderr, "failed to connect to %s (%s)\n", ip,
                 ucs_status_string(status));
+        return -1;
     }
 
-    return status;
-}
-
-/**
- * Connects the UCX client to a server at the given IP and port.
- * Returns 0 on success, non-zero on failure.
- */
-int ucx_client_connect(ucx_client_t *client, const char *ip, int port)
-{
-    // return start_client(client->ucp_worker, client->ucp_ep, ip, port);
     return 0;
 }
 
-/**
- * Receives a message from the server.
- * Returns 0 on success, non-zero on failure.
- */
-int ucx_client_receive(ucx_client_t *client, void *buffer, size_t length);
 
 ucs_status_t client_am_data_cb(void *arg, const void *header, size_t header_length,
                                void *data, size_t length,
@@ -277,54 +247,101 @@ ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *m
     return status;
 }
 
-int client_do_work(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *path)
+/**
+ * Sends a message to the server.
+ * Returns 0 on success, non-zero on failure.
+ */
+// int ucx_client_send(ucx_client_t *client, const void *data, size_t length);
+
+int ucx_client_send(ucx_client_t *client, const void *data, size_t length)
 {
-    int ret = 0;
+    ucs_status_t status;
+
+    printf("\nSending data: %s (%ld)\n", (char *)data, length);
+
+    // Send the request to the server
+    status = send_am_message(client->ucp_worker, client->ucp_ep, data, length);
+    if (status != UCS_OK) {
+        fprintf(stderr, "Failed to send path to server.\n");
+        return -1;
+    }
+
+    return 0;
+}
+
+
+/**
+ * Receives a message from the server.
+ * Returns 0 on success, non-zero on failure.
+ */
+int ucx_client_receive(ucx_client_t *client)
+{
     ucs_status_t status;
 
     // Register the receive callback for server responses
-    status = register_client_am_recv_callback(ucp_worker);
+    status = register_client_am_recv_callback(client->ucp_worker);
     if (status != UCS_OK) {
         fprintf(stderr, "Failed to register AM receive callback.\n");
-        ret = -1;
+        return -1;
     }
 
-    printf("\nSent data: %s (%ld)\n", path, strlen(path));
-
-    // Send the request to the server
-    status = send_am_message(ucp_worker, ep, path, strlen(path));
-    if (status != UCS_OK) {
-        fprintf(stderr, "Failed to send path to server.\n");
-        ret = -1;
-    }
-
-    // Wait for a response (if the server sends one)
+    // Wait for a response from the server
+    response_received = 0;  // Reset flag before waiting
     while (!response_received) {
-        ucp_worker_progress(ucp_worker);
+        ucp_worker_progress(client->ucp_worker);
     }
+
+    // int retries = 10;  // Set a retry limit (adjust as needed)
+
+    // while (!response_received && retries > 0) {
+    //     ucp_worker_progress(client->ucp_worker);
+    //     usleep(100000);  // Sleep for 100ms to avoid CPU overuse
+    //     retries--;
+    // }
+
+    // if (!response_received) {
+    //     fprintf(stderr, "Receive timeout! Server may be down.\n");
+    //     return -1;
+    // }
 
     printf("\nReceived response from server.\n");
-
-// out:
-    return ret;
+    return 0;
 }
 
-int ucx_client_run(ucp_worker_h ucp_worker, const char * server_addr, int port, char * path)
+int client_do_work(ucx_client_t *client, const char *path)
 {
-    ucp_ep_h client_ep;
+    int ret;
+
+    // Send data
+    ret = ucx_client_send(client, path, strlen(path));
+    if (ret != 0) {
+        return ret;
+    }
+
+    // Receive response
+    ret = ucx_client_receive(client);
+    if (ret != 0) {
+        return ret;
+    }
+
+    return 0;
+}
+
+int ucx_client_run(ucx_client_t * client, const char * server_addr, int port, char * path)
+{
     ucs_status_t status;
     int ret;
 
-    status = start_client(ucp_worker, &client_ep, server_addr, port);
+    status = ucx_client_connect(client, server_addr, port);
     if (status != UCS_OK) {
         fprintf(stderr, "failed to start client (%s)\n", ucs_status_string(status));
         return -1;
     }
 
-    ret = client_do_work(ucp_worker, client_ep, path);
+    ret = client_do_work(client, path);
 
     /* Close the endpoint to the server */
-    ep_close(ucp_worker, client_ep, UCP_EP_CLOSE_FLAG_FORCE);
+    ep_close(client->ucp_worker, client->ucp_ep, UCP_EP_CLOSE_FLAG_FORCE);
 
     return ret;
 }
@@ -361,10 +378,13 @@ int main(int argc, char **argv)
     path = argv[2];
 
     ret = ucx_client_init(&client);
+    if (ret != 0) {
+        fprintf(stderr, "failed to initilize client\n");
+        return -1;
+    }
 
-    ret = ucx_client_run(client.ucp_worker, server_addr, port, path);
-
-    ucp_cleanup(client->ucp_context);
+    ret = ucx_client_run(&client, server_addr, port, path);
+    ucx_client_cleanup(&client);
 
     return ret;
 }
