@@ -191,8 +191,8 @@ ucs_status_t recv_am_data_cb(void *arg, const void *header, size_t header_length
 }
 
 /**
- * Registers a callback to handle incoming Active Messages (AM) on the given UCX worker.  
- * Associates the message ID with the `recv_am_data_cb` function for processing received data.  
+ * Registers a callback to handle incoming active messages on the worker.  
+ * Associates the message ID with the callback function for processing received data.  
  */
 ucs_status_t register_am_recv_callback(ucp_worker_h worker)
 {
@@ -209,7 +209,7 @@ ucs_status_t register_am_recv_callback(ucp_worker_h worker)
 }
 
 /**
- * Callback function for handling the completion of an Active Message (AM) send operation.  
+ * Callback function for handling the completion of an active messages send operation.  
  * Frees the request and logs an error if the send operation fails.  
  */
 void send_callback(void *request, ucs_status_t status, void *user_data)
@@ -221,13 +221,13 @@ void send_callback(void *request, ucs_status_t status, void *user_data)
 }
 
 /**
- * Sends an Active Message (AM) to the specified UCX endpoint with a length-prefixed header.  
- * Uses `send_callback` to handle completion and returns the operation status.  
+ * Sends an active message to the specified endpoint with a length-prefixed header.  
+ * Uses send_callback to handle completion and returns the operation status.  
  */
-ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *msg, size_t msg_length)
+ucs_status_t send_am_data(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *msg, size_t msg_length)
 {
     if (!ep) {
-        fprintf(stderr, "send_am_message: Attempted to use a NULL endpoint!\n");
+        fprintf(stderr, "send_am_data: Attempted to use a NULL endpoint!\n");
         return UCS_ERR_INVALID_PARAM;
     }
 
@@ -276,7 +276,7 @@ int ucx_client_send(ucx_client_t *client, const void *data, size_t length)
     printf("\nSending data: %s (%ld)\n", (char *)data, length);
 
     // Send the request to the server
-    status = send_am_message(client->ucp_worker, client->ucp_ep, data, length);
+    status = send_am_data(client->ucp_worker, client->ucp_ep, data, length);
     if (status != UCS_OK) {
         fprintf(stderr, "Failed to send path to server.\n");
         return -1;
