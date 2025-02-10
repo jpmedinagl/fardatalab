@@ -1,5 +1,9 @@
 #include "ucx_util.h"
 
+/**
+ * Closes a UCX endpoint with the specified flags.  
+ * Uses non-blocking close and waits for completion before freeing the request.  
+ */
 void ep_close(ucp_worker_h ucp_worker, ucp_ep_h ep, uint64_t flags) 
 {
     ucp_request_param_t param;
@@ -24,6 +28,9 @@ void ep_close(ucp_worker_h ucp_worker, ucp_ep_h ep, uint64_t flags)
     }
 }
 
+/**
+ * Extracts and returns the IP address as a string from a sockaddr_storage structure.
+ */
 char * sockaddr_get_ip_str(const struct sockaddr_storage *sock_addr,
                            char *ip_str, size_t max_size)
 {
@@ -33,6 +40,9 @@ char * sockaddr_get_ip_str(const struct sockaddr_storage *sock_addr,
     return ip_str;
 }
 
+/**
+ * Extracts and returns the port number as a string from a sockaddr_storage structure.
+ */
 char * sockaddr_get_port_str(const struct sockaddr_storage *sock_addr,
                              char *port_str, size_t max_size)
 {
@@ -40,16 +50,4 @@ char * sockaddr_get_port_str(const struct sockaddr_storage *sock_addr,
     memcpy(&addr_in, sock_addr, sizeof(struct sockaddr_in));
     snprintf(port_str, max_size, "%d", ntohs(addr_in.sin_port));
     return port_str;
-}
-
-void set_sock_addr(struct sockaddr_storage *saddr)
-{
-    struct sockaddr_in * sa_in;
-
-    memset(saddr, 0, sizeof(*saddr));
-
-    sa_in = (struct sockaddr_in*)saddr;
-    sa_in->sin_addr.s_addr = INADDR_ANY;
-    sa_in->sin_family = AF_INET;
-    sa_in->sin_port = htons(DEFAULT_PORT);
 }

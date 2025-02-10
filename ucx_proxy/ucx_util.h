@@ -10,22 +10,21 @@
 
 
 /**
- * Close UCP endpoint.
- *
- * @param [in]  worker  Handle to the worker that the endpoint is associated
- *                      with.
- * @param [in]  ep      Handle to the endpoint to close.
- * @param [in]  flags   Close UCP endpoint mode. Please see
- *                      @a ucp_ep_close_flags_t for details.
+ * Closes a UCX endpoint with the specified flags.  
+ * Uses non-blocking close and waits for completion before freeing the request.  
  */
 void ep_close(ucp_worker_h ucp_worker, ucp_ep_h ep, uint64_t flags);
 
+/**
+ * Extracts and returns the IP address as a string from a sockaddr_storage structure.
+ */
 char * sockaddr_get_ip_str(const struct sockaddr_storage *sock_addr,
                            char *ip_str, size_t max_size);
 
+/**
+ * Extracts and returns the port number as a string from a sockaddr_storage structure.
+ */
 char * sockaddr_get_port_str(const struct sockaddr_storage *sock_addr,
                              char *port_str, size_t max_size);
-
-void set_sock_addr(struct sockaddr_storage *saddr);
 
 #endif

@@ -15,10 +15,10 @@ static int connection_closed = 0;
 static int response_received = 0;
 
 /**
- * Initialize the worker for this server. We are using a single thread to 
- * process incoming requests.
+ * Initialize the worker for the client. We are using a single thread to 
+ * process requests.
  */
-int init_worker(ucp_context_h ucp_context, ucp_worker_h *ucp_worker)
+int worker_init(ucp_context_h ucp_context, ucp_worker_h *ucp_worker)
 {
     ucp_worker_params_t worker_params;
     ucs_status_t status;
@@ -65,7 +65,7 @@ int ucx_client_init(ucx_client_t *client)
     }
 
     // initalize worker 
-    ret = init_worker(client->ucp_context, &(client->ucp_worker));
+    ret = worker_init(client->ucp_context, &(client->ucp_worker));
     if (ret != 0) {
         ucx_client_cleanup(client);
     }
@@ -73,6 +73,9 @@ int ucx_client_init(ucx_client_t *client)
     return ret;
 }
 
+/**
+ * Callback for error. Specifically used for connecting to server.
+ */
 void err_cb(void *arg, ucp_ep_h ep, ucs_status_t status)
 {
     printf("error handling callback was invoked with status %d (%s)\n",
@@ -80,6 +83,9 @@ void err_cb(void *arg, ucp_ep_h ep, ucs_status_t status)
     connection_closed = 1;
 }
 
+/**
+ * Initializes a sockaddr_storage structure with the given IPv4 address and port.
+ */
 void set_sock_server_addr(const char *address_str, int port, struct sockaddr_storage *saddr)
 {
     struct sockaddr_in * sa_in;
@@ -87,7 +93,6 @@ void set_sock_server_addr(const char *address_str, int port, struct sockaddr_sto
     memset(saddr, 0, sizeof(*saddr));
 
     sa_in = (struct sockaddr_in*)saddr;
-    // sa_in->sin_addr.s_addr = address_str;
     sa_in->sin_family = AF_INET;
     sa_in->sin_port = htons(port);
 
@@ -96,9 +101,7 @@ void set_sock_server_addr(const char *address_str, int port, struct sockaddr_sto
         exit(EXIT_FAILURE);
     }
 
-    printf("client connected to IP %s port %d\n",
-            address_str,
-            port);
+    printf("client connected to IP %s port %d\n", address_str, port);
 }
 
 /**
@@ -134,8 +137,11 @@ int ucx_client_connect(ucx_client_t *client, const char *ip, int port)
     return 0;
 }
 
-
-ucs_status_t client_am_data_cb(void *arg, const void *header, size_t header_length,
+/**
+ * Handles received Active Messages (AM) data. Part of the ucp callback. 
+ * Allocates the total size from header, and copies full message.  
+ */
+ucs_status_t recv_am_data_cb(void *arg, const void *header, size_t header_length,
                                void *data, size_t length,
                                const ucp_am_recv_param_t *param)
 {
@@ -184,20 +190,28 @@ ucs_status_t client_am_data_cb(void *arg, const void *header, size_t header_leng
     return UCS_OK;
 }
 
-ucs_status_t register_client_am_recv_callback(ucp_worker_h worker)
+/**
+ * Registers a callback to handle incoming active messages on the worker.  
+ * Associates the message ID with the callback function for processing received data.  
+ */
+ucs_status_t register_am_recv_callback(ucp_worker_h worker)
 {
     ucp_am_handler_param_t param;
 
     param.field_mask = UCP_AM_HANDLER_PARAM_FIELD_ID |
                        UCP_AM_HANDLER_PARAM_FIELD_CB |
                        UCP_AM_HANDLER_PARAM_FIELD_ARG;
-    param.id         = AM_ID_RESPONSE;  // Different from request AM_ID
-    param.cb         = client_am_data_cb;  // Client's receive handler
+    param.id         = AM_ID_RESPONSE;
+    param.cb         = recv_am_data_cb;
     param.arg        = worker; 
 
     return ucp_worker_set_am_recv_handler(worker, &param);
 }
 
+/**
+ * Callback function for handling the completion of an active messages send operation.  
+ * Frees the request and logs an error if the send operation fails.  
+ */
 void send_callback(void *request, ucs_status_t status, void *user_data)
 {
     if (status != UCS_OK) {
@@ -206,10 +220,14 @@ void send_callback(void *request, ucs_status_t status, void *user_data)
     ucp_request_free(request);
 }
 
-ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *msg, size_t msg_length)
+/**
+ * Sends an active message to the specified endpoint with a length-prefixed header.  
+ * Uses send_callback to handle completion and returns the operation status.  
+ */
+ucs_status_t send_am_data(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *msg, size_t msg_length)
 {
     if (!ep) {
-        fprintf(stderr, "send_am_message: Attempted to use a NULL endpoint!\n");
+        fprintf(stderr, "send_am_data: Attempted to use a NULL endpoint!\n");
         return UCS_ERR_INVALID_PARAM;
     }
 
@@ -251,8 +269,6 @@ ucs_status_t send_am_message(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *m
  * Sends a message to the server.
  * Returns 0 on success, non-zero on failure.
  */
-// int ucx_client_send(ucx_client_t *client, const void *data, size_t length);
-
 int ucx_client_send(ucx_client_t *client, const void *data, size_t length)
 {
     ucs_status_t status;
@@ -260,7 +276,7 @@ int ucx_client_send(ucx_client_t *client, const void *data, size_t length)
     printf("\nSending data: %s (%ld)\n", (char *)data, length);
 
     // Send the request to the server
-    status = send_am_message(client->ucp_worker, client->ucp_ep, data, length);
+    status = send_am_data(client->ucp_worker, client->ucp_ep, data, length);
     if (status != UCS_OK) {
         fprintf(stderr, "Failed to send path to server.\n");
         return -1;
@@ -271,7 +287,8 @@ int ucx_client_send(ucx_client_t *client, const void *data, size_t length)
 
 
 /**
- * Receives a message from the server.
+ * Registers the receive am callback. Once a request is received, it will use
+ * callback function.
  * Returns 0 on success, non-zero on failure.
  */
 int ucx_client_receive(ucx_client_t *client)
@@ -279,7 +296,7 @@ int ucx_client_receive(ucx_client_t *client)
     ucs_status_t status;
 
     // Register the receive callback for server responses
-    status = register_client_am_recv_callback(client->ucp_worker);
+    status = register_am_recv_callback(client->ucp_worker);
     if (status != UCS_OK) {
         fprintf(stderr, "Failed to register AM receive callback.\n");
         return -1;
@@ -290,6 +307,8 @@ int ucx_client_receive(ucx_client_t *client)
     while (!response_received) {
         ucp_worker_progress(client->ucp_worker);
     }
+
+    // retry limit - could be implemented in case server timeouts
 
     // int retries = 10;  // Set a retry limit (adjust as needed)
 
@@ -308,6 +327,10 @@ int ucx_client_receive(ucx_client_t *client)
     return 0;
 }
 
+/**
+ * Sends a request (path) to the server and waits for a response.  
+ * Returns 0 on success, non-zero on failure.  
+ */
 int client_do_work(ucx_client_t *client, const char *path)
 {
     int ret;
@@ -327,6 +350,10 @@ int client_do_work(ucx_client_t *client, const char *path)
     return 0;
 }
 
+/**
+ * Runs the UCX client by connecting to the server, sending a request, and receiving a response.  
+ * Closes the connection once received.  
+ */
 int ucx_client_run(ucx_client_t * client, const char * server_addr, int port, char * path)
 {
     ucs_status_t status;

@@ -35,10 +35,10 @@ typedef struct {
 int ucx_server_init(ucx_server_t *server);
 
 /**
- * Starts the UCX listener to accept incoming client connections.
+ * Sets up socket. Starts the UCX listener to accept incoming client connections.
  * Returns 0 on success, non-zero on failure.
  */
-int ucx_server_listen(ucx_server_t *server, const char *ip, int port);
+int ucx_server_listen(ucx_server_t *server, ucx_connection_t *connection);
 
 /**
  * Runs the UCX event loop to process messages.
