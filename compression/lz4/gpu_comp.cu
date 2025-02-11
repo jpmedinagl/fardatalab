@@ -57,7 +57,7 @@ void compression(char* input_data, const size_t in_bytes)
     // Allocate device memory
     char* device_input_data;
     CUDA_CHECK(cudaMalloc(&device_input_data, in_bytes));
-    CUDA_CHECK(cudaMemcpyAsync(device_input_data, input_data, in_bytes, cudaMemcpyHostToDevice, stream));
+    CUDA_CHECK(cudaMemcpy(device_input_data, input_data, in_bytes, cudaMemcpyHostToDevice));
 
     // Set up uncompressed data pointers and sizes
     size_t* host_uncompressed_bytes;
@@ -76,8 +76,8 @@ void compression(char* input_data, const size_t in_bytes)
     void** device_uncompressed_ptrs;
     CUDA_CHECK(cudaMalloc(&device_uncompressed_bytes, sizeof(size_t) * batch_size));
     CUDA_CHECK(cudaMalloc(&device_uncompressed_ptrs, sizeof(void*) * batch_size));
-    CUDA_CHECK(cudaMemcpyAsync(device_uncompressed_bytes, host_uncompressed_bytes, sizeof(size_t) * batch_size, cudaMemcpyHostToDevice, stream));
-    CUDA_CHECK(cudaMemcpyAsync(device_uncompressed_ptrs, host_uncompressed_ptrs, sizeof(void*) * batch_size, cudaMemcpyHostToDevice, stream));
+    CUDA_CHECK(cudaMemcpy(device_uncompressed_bytes, host_uncompressed_bytes, sizeof(size_t) * batch_size, cudaMemcpyHostToDevice));
+    CUDA_CHECK(cudaMemcpy(device_uncompressed_ptrs, host_uncompressed_ptrs, sizeof(void*) * batch_size, cudaMemcpyHostToDevice));
 
     // Allocate space for temporary memory and compressed data
     size_t temp_bytes;
@@ -96,7 +96,7 @@ void compression(char* input_data, const size_t in_bytes)
 
     void** device_compressed_ptrs;
     CUDA_CHECK(cudaMalloc(&device_compressed_ptrs, sizeof(void*) * batch_size));
-    CUDA_CHECK(cudaMemcpyAsync(device_compressed_ptrs, host_compressed_ptrs, sizeof(void*) * batch_size, cudaMemcpyHostToDevice, stream));
+    CUDA_CHECK(cudaMemcpy(device_compressed_ptrs, host_compressed_ptrs, sizeof(void*) * batch_size, cudaMemcpyHostToDevice));
 
     size_t* device_compressed_bytes;
     CUDA_CHECK(cudaMalloc(&device_compressed_bytes, sizeof(size_t) * batch_size));
@@ -109,7 +109,7 @@ void compression(char* input_data, const size_t in_bytes)
     CUDA_CHECK(cudaEventRecord(start, 0));
 
     // Perform GPU compression using nvcomp
-    nvcompStatus_t comp_res = nvcompBatchedLZ4CompressAsync(
+    nvcompStatus_t comp_res = nvcompBatchedLZ4Compress(
         device_uncompressed_ptrs,
         device_uncompressed_bytes,
         chunk_size,
@@ -118,8 +118,8 @@ void compression(char* input_data, const size_t in_bytes)
         temp_bytes,
         device_compressed_ptrs,
         device_compressed_bytes,
-        nvcompBatchedLZ4DefaultOpts,
-        stream
+        nvcompBatchedLZ4DefaultOpts
+        // stream
     );
 
     CUDA_CHECK(cudaEventRecord(stop, 0));
