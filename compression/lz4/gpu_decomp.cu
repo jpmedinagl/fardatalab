@@ -157,22 +157,32 @@ void decompression(char* compressed_data, size_t compressed_size)
     CUDA_CHECK(cudaMalloc(&device_compressed_data, compressed_size));
     CUDA_CHECK(cudaMemcpyAsync(device_compressed_data, compressed_data, compressed_size, cudaMemcpyHostToDevice, stream));
 
+    std::cout << "transfer\n";
+
     const size_t chunk_size = 65536;
     size_t num_chunks = (compressed_size + chunk_size - 1) / chunk_size;
+
+    std::cout << "transfer\n";
 
     void** host_compressed_ptrs;
     CUDA_CHECK(cudaMallocHost(&host_compressed_ptrs, sizeof(void*) * num_chunks));
     for (size_t i = 0; i < num_chunks; ++i) {
         host_compressed_ptrs[i] = device_compressed_data + chunk_size * i;
     }
+
+    std::cout << "transfer\n";
     
     void** device_compressed_ptrs;
     CUDA_CHECK(cudaMalloc(&device_compressed_ptrs, sizeof(void*) * num_chunks));
     CUDA_CHECK(cudaMemcpyAsync(device_compressed_ptrs, host_compressed_ptrs, sizeof(void*) * num_chunks, cudaMemcpyHostToDevice, stream));
 
+    std::cout << "transfer\n";
+
     size_t* device_compressed_bytes;
     CUDA_CHECK(cudaMalloc(&device_compressed_bytes, sizeof(size_t) * num_chunks));
     CUDA_CHECK(cudaMemcpyAsync(device_compressed_bytes, &compressed_size, sizeof(size_t) * num_chunks, cudaMemcpyHostToDevice, stream));
+
+    std::cout << "transfer\n";
 
     size_t* device_uncompressed_bytes;
     CUDA_CHECK(cudaMalloc(&device_uncompressed_bytes, sizeof(size_t) * num_chunks));
