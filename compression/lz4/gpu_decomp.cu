@@ -132,7 +132,14 @@ void compression(char* input_data, const size_t in_bytes, char*& compressed_data
     CUDA_CHECK(cudaStreamSynchronize(stream));
     
     compressed_data = new char[compressed_size];
-    CUDA_CHECK(cudaMemcpy(compressed_data, host_compressed_ptrs, compressed_size, cudaMemcpyDeviceToHost));
+    size_t offset = 0;
+    for (size_t i = 0; i < batch_size; ++i) {
+        size_t chunk_bytes;
+        CUDA_CHECK(cudaMemcpy(&chunk_bytes, &device_compressed_bytes[i], sizeof(size_t), cudaMemcpyDeviceToHost));
+        
+        CUDA_CHECK(cudaMemcpy(compressed_data + offset, host_compressed_ptrs[i], chunk_bytes, cudaMemcpyDeviceToHost));
+        offset += chunk_bytes;
+    }
 
     CUDA_CHECK(cudaEventDestroy(start));
     CUDA_CHECK(cudaEventDestroy(stop));
