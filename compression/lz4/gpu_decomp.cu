@@ -26,7 +26,7 @@ void read_file_data(const char* filename, char*& data, size_t& size)
     file.close();
 }
 
-void write_file_data(const char* filename, char* data, size_t size, char*& compressed_data, size_t& compressed_size)
+void write_file_data(const char* filename, char* data, size_t size)
 {
     std::ofstream file(filename, std::ios::binary);
     if (!file.is_open()) {
@@ -37,7 +37,7 @@ void write_file_data(const char* filename, char* data, size_t size, char*& compr
     file.close();
 }
 
-void compression(char* input_data, const size_t in_bytes)
+void compression(char* input_data, const size_t in_bytes, char*& compressed_data, size_t& compressed_size)
 {
     // Create a CUDA stream
     cudaStream_t stream;
@@ -247,7 +247,7 @@ int main(int argc, char **argv)
 
     char* compressed_data = nullptr;
     size_t compressed_size = 0;
-    compress_example(uncompressed_data, uncompressed_size, compressed_data, compressed_size);
+    compression(uncompressed_data, uncompressed_size, compressed_data, compressed_size);
     // write_file_data("tmp.bin", compressed_data, compressed_size);
 
     std::cout << "Starting GPU decompression..." << std::endl;
