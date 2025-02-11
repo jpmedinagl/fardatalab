@@ -191,22 +191,33 @@ void decompression(char* compressed_data, size_t compressed_size)
     nvcompBatchedLZ4DecompressGetTempSize(num_chunks, chunk_size, &temp_bytes);
     void* device_temp_ptr;
     CUDA_CHECK(cudaMalloc(&device_temp_ptr, temp_bytes));
+    
+    std::cout << "transfer\n";
 
     size_t uncompressed_size = num_chunks * chunk_size;
     char* device_uncompressed_data;
     CUDA_CHECK(cudaMalloc(&device_uncompressed_data, uncompressed_size));
+    
+    std::cout << "transfer\n";
 
     void** host_uncompressed_ptrs;
     CUDA_CHECK(cudaMallocHost(&host_uncompressed_ptrs, sizeof(void*) * num_chunks));
     for (size_t i = 0; i < num_chunks; ++i) {
         host_uncompressed_ptrs[i] = device_uncompressed_data + chunk_size * i;
     }
+    
+    std::cout << "transfer\n";
+
     void** device_uncompressed_ptrs;
     CUDA_CHECK(cudaMalloc(&device_uncompressed_ptrs, sizeof(void*) * num_chunks));
     CUDA_CHECK(cudaMemcpyAsync(device_uncompressed_ptrs, host_uncompressed_ptrs, sizeof(void*) * num_chunks, cudaMemcpyHostToDevice, stream));
 
+    std::cout << "transfer\n";
+
     nvcompStatus_t* device_statuses;
     CUDA_CHECK(cudaMalloc(&device_statuses, sizeof(nvcompStatus_t) * num_chunks));
+    
+    std::cout << "transfer\n";
 
     cudaEvent_t start, stop;
     CUDA_CHECK(cudaEventCreate(&start));
@@ -225,6 +236,8 @@ void decompression(char* compressed_data, size_t compressed_size)
         device_statuses,
         stream
     );
+    
+    std::cout << "transfer\n";
     
     CUDA_CHECK(cudaEventRecord(stop, stream));
     CUDA_CHECK(cudaEventSynchronize(stop));
