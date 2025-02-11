@@ -40,6 +40,9 @@ void cpu_compress(char* input_data, const size_t in_bytes)
     float throughput = (in_bytes / (1024.0f * 1024.0f)) / (duration.count() / 1000.0f);
     std::cout << "CPU Throughput: " << throughput << " MB/s\n";
 
+    auto ratio = (float) compressed_size / in_bytes;
+    std::cout << "CPU ratio: " << ratio << "\n";
+
     delete[] compressed_data;
 }
 
