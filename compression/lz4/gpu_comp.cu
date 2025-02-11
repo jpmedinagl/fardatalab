@@ -33,7 +33,18 @@ void read_file_data(const char* filename, char*& data, size_t& size)
     file.close();
 }
 
-void execute_example(char* input_data, const size_t in_bytes)
+void write_file_data(const char* filename, char* data, size_t size)
+{
+    std::ofstream file(filename, std::ios::binary);
+    if (!file.is_open()) {
+        std::cerr << "Failed to open file for writing: " << filename << std::endl;
+        exit(EXIT_FAILURE);
+    }
+    file.write(data, size);
+    file.close();
+}
+
+void compression(char* input_data, const size_t in_bytes)
 {
     // Create a CUDA stream
     cudaStream_t stream;
@@ -127,7 +138,17 @@ void execute_example(char* input_data, const size_t in_bytes)
     CUDA_CHECK(cudaEventDestroy(start));
     CUDA_CHECK(cudaEventDestroy(stop));
 
+    // Retrieve the compressed data from device to host
+    char* compressed_data = new char[batch_size * max_out_bytes];
+    for (size_t i = 0; i < batch_size; ++i) {
+        CUDA_CHECK(cudaMemcpy(compressed_data + i * max_out_bytes, host_compressed_ptrs[i], max_out_bytes, cudaMemcpyDeviceToHost));
+    }
+
+    // Write compressed data to a file
+    write_file_data("temp", compressed_data, batch_size * max_out_bytes);
+
     // Clean up
+    delete[] compressed_data;
     CUDA_CHECK(cudaStreamSynchronize(stream));
     CUDA_CHECK(cudaStreamDestroy(stream));
 }
@@ -148,7 +169,7 @@ int main(int argc, char ** argv)
 
     // Run GPU compression
     std::cout << "Starting GPU compression..." << std::endl;
-    execute_example(uncompressed_data, data_size);
+    compression(uncompressed_data, data_size);
 
     // Clean up
     delete[] uncompressed_data;
