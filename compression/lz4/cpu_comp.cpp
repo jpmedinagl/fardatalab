@@ -1,7 +1,24 @@
+#include <fstream>
 #include <iostream>
 #include <chrono>
 #include <lz4.h>
 #include <random>  // Add this header for random number generation
+
+void read_file_data(const char* filename, char*& data, size_t& size)
+{
+    std::ifstream file(filename, std::ios::binary | std::ios::ate);
+    if (!file.is_open()) {
+        std::cerr << "Error: Unable to open file: " << filename << std::endl;
+        exit(EXIT_FAILURE);
+    }
+
+    size = file.tellg();
+    file.seekg(0, std::ios::beg);
+    data = new char[size];
+
+    file.read(data, size);
+    file.close();
+}
 
 void cpu_compress(char* input_data, const size_t in_bytes)
 {
@@ -18,7 +35,7 @@ void cpu_compress(char* input_data, const size_t in_bytes)
         return;
     }
 
-    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+    auto duration = std::chrono::duration<float, std::milli>(stop - start);
     std::cout << "CPU compression time: " << duration.count() << " ms\n";
     float throughput = (in_bytes / (1024.0f * 1024.0f)) / (duration.count() / 1000.0f);
     std::cout << "CPU Throughput: " << throughput << " MB/s\n";
@@ -26,20 +43,22 @@ void cpu_compress(char* input_data, const size_t in_bytes)
     delete[] compressed_data;
 }
 
-int main()
+int main(int argc, char ** argv)
 {
-    const size_t in_bytes = 10000000;  // 10 MB for testing
-    char* uncompressed_data = new char[in_bytes];
-
-    // Initialize random data
-    std::mt19937 random_gen(42);  // Use mt19937 for random number generation
-    std::uniform_int_distribution<short> uniform_dist(0, 255);  // Uniform distribution from 0 to 255
-    for (size_t ix = 0; ix < in_bytes; ++ix) {
-        uncompressed_data[ix] = static_cast<char>(uniform_dist(random_gen));
+    if (argc != 2) {
+    	std::cout << "usage: ./cpu_comp <file>\n";
+	return 1;
     }
 
+    const char* filename = argv[1];  // Change this to your data file
+    char* uncompressed_data = nullptr;
+    size_t data_size = 0;
+
+    // Read the data from the file
+    read_file_data(filename, uncompressed_data, data_size);
+
     // Run CPU compression
-    cpu_compress(uncompressed_data, in_bytes);
+    cpu_compress(uncompressed_data, data_size);
 
     delete[] uncompressed_data;
 
