@@ -44,31 +44,6 @@ void write_file_data(const char* filename, char* data, size_t size)
     file.close();
 }
 
-void compression(char* input_data, const size_t in_bytes) {
-    // Create a CUDA stream
-    cudaStream_t stream;
-    CUDA_CHECK(cudaStreamCreate(&stream));
-
-    // Define chunk size
-    const size_t chunk_size = 65536;
-    
-    // Calculate the number of sections needed based on chunk size
-    const size_t num_chunks = (in_bytes + chunk_size - 1) / chunk_size;
-
-    // Iterate over the input data in chunks
-    for (size_t chunk_idx = 0; chunk_idx < num_chunks; ++chunk_idx) {
-        size_t chunk_offset = chunk_idx * chunk_size;
-        size_t chunk_data_size = std::min(chunk_size, in_bytes - chunk_offset);
-
-        // Call compression for the current chunk of data
-        compress_chunk(input_data + chunk_offset, chunk_data_size, stream);
-    }
-
-    // Cleanup stream
-    CUDA_CHECK(cudaStreamSynchronize(stream));
-    CUDA_CHECK(cudaStreamDestroy(stream));
-}
-
 void compress_chunk(char* input_data_chunk, const size_t chunk_size, cudaStream_t stream) {
     // Allocate device memory
     char* device_input_data;
@@ -157,6 +132,31 @@ void compress_chunk(char* input_data_chunk, const size_t chunk_size, cudaStream_
     CUDA_CHECK(cudaFree(device_compressed_bytes));
     CUDA_CHECK(cudaFree(device_uncompressed_bytes));
     CUDA_CHECK(cudaFree(device_uncompressed_ptrs));
+}
+
+void compression(char* input_data, const size_t in_bytes) {
+    // Create a CUDA stream
+    cudaStream_t stream;
+    CUDA_CHECK(cudaStreamCreate(&stream));
+
+    // Define chunk size
+    const size_t chunk_size = 65536;
+    
+    // Calculate the number of sections needed based on chunk size
+    const size_t num_chunks = (in_bytes + chunk_size - 1) / chunk_size;
+
+    // Iterate over the input data in chunks
+    for (size_t chunk_idx = 0; chunk_idx < num_chunks; ++chunk_idx) {
+        size_t chunk_offset = chunk_idx * chunk_size;
+        size_t chunk_data_size = std::min(chunk_size, in_bytes - chunk_offset);
+
+        // Call compression for the current chunk of data
+        compress_chunk(input_data + chunk_offset, chunk_data_size, stream);
+    }
+
+    // Cleanup stream
+    CUDA_CHECK(cudaStreamSynchronize(stream));
+    CUDA_CHECK(cudaStreamDestroy(stream));
 }
 
 int main(int argc, char ** argv)
