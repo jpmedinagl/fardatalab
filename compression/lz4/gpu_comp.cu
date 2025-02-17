@@ -147,6 +147,22 @@ void compression(char* input_data, const size_t in_bytes)
     // Write compressed data to a file
     write_file_data("temp", compressed_data, batch_size * max_out_bytes);
 
+    // Retrieve the total compressed size from the device
+    size_t total_compressed_size = 0;
+    size_t* host_compressed_bytes = new size_t[batch_size];
+    CUDA_CHECK(cudaMemcpy(host_compressed_bytes, device_compressed_bytes, sizeof(size_t) * batch_size, cudaMemcpyDeviceToHost));
+
+    // Sum up the sizes of all compressed chunks
+    for (size_t i = 0; i < batch_size; ++i) {
+        total_compressed_size += host_compressed_bytes[i];
+    }
+
+    // Calculate the GPU compression ratio
+    float gpu_ratio = (float) in_bytes / total_compressed_size;
+    std::cout << "GPU ratio: " << gpu_ratio << "\n";
+
+    delete[] host_compressed_bytes;
+
     // Clean up
     delete[] compressed_data;
     CUDA_CHECK(cudaStreamSynchronize(stream));
