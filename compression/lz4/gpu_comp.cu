@@ -109,7 +109,7 @@ void compression(char* input_data, const size_t in_bytes)
     CUDA_CHECK(cudaEventRecord(start, 0));
 
     // Perform GPU compression using nvcomp
-    nvcompStatus_t comp_res = nvcompBatchedLZ4Compress(
+    nvcompStatus_t comp_res = nvcompBatchedLZ4CompressAsync(
         device_uncompressed_ptrs,
         device_uncompressed_bytes,
         chunk_size,
