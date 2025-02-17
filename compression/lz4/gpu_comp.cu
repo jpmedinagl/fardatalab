@@ -118,7 +118,7 @@ void compression(char* input_data, const size_t in_bytes)
         temp_bytes,
         device_compressed_ptrs,
         device_compressed_bytes,
-        nvcompBatchedLZ4DefaultOpts
+        nvcompBatchedLZ4DefaultOpts,
         stream
     );
 
