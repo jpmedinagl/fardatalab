@@ -119,7 +119,7 @@ void compression(char* input_data, const size_t in_bytes)
         device_compressed_ptrs,
         device_compressed_bytes,
         nvcompBatchedLZ4DefaultOpts
-        // stream
+        stream
     );
 
     CUDA_CHECK(cudaEventRecord(stop, 0));
