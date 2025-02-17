@@ -112,7 +112,7 @@ void compress_chunk(char* input_data_chunk, const size_t chunk_size, cudaStream_
     }
 
     std::cout << "GPU compression time for chunk: " << gpuTime << " ms\n";
-    float gpuThroughput = (in_bytes / (1024.0f * 1024.0f)) / (gpuTime / 1000.0f);
+    float gpuThroughput = (chunk_size / (1024.0f * 1024.0f)) / (gpuTime / 1000.0f);
     std::cout << "GPU Throughput: " << gpuThroughput << " MB/s\n";
 
     // Retrieve the compressed data from device to host
