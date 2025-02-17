@@ -46,6 +46,8 @@ void write_file_data(const char* filename, char* data, size_t size)
 
 void compress_chunk(char* input_data_chunk, const size_t chunk_size, cudaStream_t stream) {
     // Allocate device memory
+    CUDA_CHECK(cudaStreamCreate(&stream));
+
     char* device_input_data;
     CUDA_CHECK(cudaMalloc(&device_input_data, chunk_size));
     CUDA_CHECK(cudaMemcpy(device_input_data, input_data_chunk, chunk_size, cudaMemcpyHostToDevice));
@@ -132,6 +134,8 @@ void compress_chunk(char* input_data_chunk, const size_t chunk_size, cudaStream_
     CUDA_CHECK(cudaFree(device_compressed_bytes));
     CUDA_CHECK(cudaFree(device_uncompressed_bytes));
     CUDA_CHECK(cudaFree(device_uncompressed_ptrs));
+
+    CUDA_CHECK(cudaStreamSynchronize(stream));
 }
 
 void compression(char* input_data, const size_t in_bytes) {
