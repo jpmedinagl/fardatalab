@@ -44,7 +44,7 @@ void write_file_data(const char* filename, char* data, size_t size)
     file.close();
 }
 
-void compress_chunk(char* input_data, const size_t chunk_size, const size_t in_bytes)
+void compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t stream)
 {
     // Create a CUDA stream
     cudaStream_t stream;
@@ -55,6 +55,7 @@ void compress_chunk(char* input_data, const size_t chunk_size, const size_t in_b
     // const size_t batch_size = (in_bytes + chunk_size - 1) / chunk_size;
 
     const size_t batch_size = 1;
+    const size_t in_bytes = chunk_size;
 
     // Allocate device memory
     char* device_input_data;
