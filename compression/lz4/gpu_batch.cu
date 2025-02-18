@@ -47,8 +47,8 @@ void write_file_data(const char* filename, char* data, size_t size)
 void compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t stream)
 {
     // Create a CUDA stream
-    cudaStream_t stream;
-    CUDA_CHECK(cudaStreamCreate(&stream));
+    // cudaStream_t stream;
+    // CUDA_CHECK(cudaStreamCreate(&stream));
 
     // Define chunk size and batch size
     // const size_t chunk_size = 65536;
@@ -168,8 +168,8 @@ void compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t stre
 
     // Clean up
     delete[] compressed_data;
-    CUDA_CHECK(cudaStreamSynchronize(stream));
-    CUDA_CHECK(cudaStreamDestroy(stream));
+    // CUDA_CHECK(cudaStreamSynchronize(stream));
+    // CUDA_CHECK(cudaStreamDestroy(stream));
 }
 
 int compression(char* input_data, const size_t in_bytes) {
