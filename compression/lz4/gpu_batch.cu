@@ -105,11 +105,11 @@ int compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t strea
     CUDA_CHECK(cudaMalloc(&device_compressed_bytes, sizeof(size_t) * batch_size));
 
     // Start the timer for GPU compression
-    cudaEvent_t start, stop;
-    float gpuTime = 0.0f;
-    CUDA_CHECK(cudaEventCreate(&start));
-    CUDA_CHECK(cudaEventCreate(&stop));
-    CUDA_CHECK(cudaEventRecord(start, 0));
+    // cudaEvent_t start, stop;
+    // float gpuTime = 0.0f;
+    // CUDA_CHECK(cudaEventCreate(&start));
+    // CUDA_CHECK(cudaEventCreate(&stop));
+    // CUDA_CHECK(cudaEventRecord(start, 0));
 
     // Perform GPU compression using nvcomp
     nvcompStatus_t comp_res = nvcompBatchedLZ4CompressAsync(
@@ -125,49 +125,49 @@ int compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t strea
         stream
     );
 
-    CUDA_CHECK(cudaEventRecord(stop, 0));
-    CUDA_CHECK(cudaEventSynchronize(stop));
-    CUDA_CHECK(cudaEventElapsedTime(&gpuTime, start, stop));
+    // CUDA_CHECK(cudaEventRecord(stop, 0));
+    // CUDA_CHECK(cudaEventSynchronize(stop));
+    // CUDA_CHECK(cudaEventElapsedTime(&gpuTime, start, stop));
 
     if (comp_res != nvcompSuccess) {
         std::cerr << "GPU compression failed!" << std::endl;
         return -1;
     }
 
-    std::cout << "GPU compression time: " << gpuTime << " ms\n";
-    float gpuThroughput = (in_bytes / (1024.0f * 1024.0f)) / (gpuTime / 1000.0f);
-    std::cout << "GPU Throughput: " << gpuThroughput << " MB/s\n";
+    // std::cout << "GPU compression time: " << gpuTime << " ms\n";
+    // float gpuThroughput = (in_bytes / (1024.0f * 1024.0f)) / (gpuTime / 1000.0f);
+    // std::cout << "GPU Throughput: " << gpuThroughput << " MB/s\n";
 
-    CUDA_CHECK(cudaEventDestroy(start));
-    CUDA_CHECK(cudaEventDestroy(stop));
+    // CUDA_CHECK(cudaEventDestroy(start));
+    // CUDA_CHECK(cudaEventDestroy(stop));
 
     // Retrieve the compressed data from device to host
-    char* compressed_data = new char[batch_size * max_out_bytes];
-    for (size_t i = 0; i < batch_size; ++i) {
-        CUDA_CHECK(cudaMemcpy(compressed_data + i * max_out_bytes, host_compressed_ptrs[i], max_out_bytes, cudaMemcpyDeviceToHost));
-    }
+    // char* compressed_data = new char[batch_size * max_out_bytes];
+    // for (size_t i = 0; i < batch_size; ++i) {
+    //     CUDA_CHECK(cudaMemcpy(compressed_data + i * max_out_bytes, host_compressed_ptrs[i], max_out_bytes, cudaMemcpyDeviceToHost));
+    // }
 
     // Write compressed data to a file
     // write_file_data("temp", compressed_data, batch_size * max_out_bytes);
 
     // Retrieve the total compressed size from the device
-    size_t total_compressed_size = 0;
-    size_t* host_compressed_bytes = new size_t[batch_size];
-    CUDA_CHECK(cudaMemcpy(host_compressed_bytes, device_compressed_bytes, sizeof(size_t) * batch_size, cudaMemcpyDeviceToHost));
+    // size_t total_compressed_size = 0;
+    // size_t* host_compressed_bytes = new size_t[batch_size];
+    // CUDA_CHECK(cudaMemcpy(host_compressed_bytes, device_compressed_bytes, sizeof(size_t) * batch_size, cudaMemcpyDeviceToHost));
 
-    // Sum up the sizes of all compressed chunks
-    for (size_t i = 0; i < batch_size; ++i) {
-        total_compressed_size += host_compressed_bytes[i];
-    }
+    // // Sum up the sizes of all compressed chunks
+    // for (size_t i = 0; i < batch_size; ++i) {
+    //     total_compressed_size += host_compressed_bytes[i];
+    // }
 
     // Calculate the GPU compression ratio
-    float gpu_ratio = (float) in_bytes / total_compressed_size;
-    std::cout << "GPU ratio: " << gpu_ratio << "\n";
+    // float gpu_ratio = (float) in_bytes / total_compressed_size;
+    // std::cout << "GPU ratio: " << gpu_ratio << "\n";
 
-    delete[] host_compressed_bytes;
+    // delete[] host_compressed_bytes;
 
     // Clean up
-    delete[] compressed_data;
+    // delete[] compressed_data;
     // CUDA_CHECK(cudaStreamSynchronize(stream));
     // CUDA_CHECK(cudaStreamDestroy(stream));
     return 0;
@@ -184,6 +184,12 @@ int compression(char* input_data, const size_t in_bytes) {
     // Calculate the number of sections needed based on chunk size
     const size_t num_chunks = (in_bytes + chunk_size - 1) / chunk_size;
 
+    cudaEvent_t start_o, stop_o;
+    float gpuTime = 0.0f;
+    CUDA_CHECK(cudaEventCreate(&start_o));
+    CUDA_CHECK(cudaEventCreate(&stop_o));
+    CUDA_CHECK(cudaEventRecord(start_o, 0));
+
     // Iterate over the input data in chunks
     for (size_t chunk_idx = 0; chunk_idx < num_chunks; ++chunk_idx) {
         size_t chunk_offset = chunk_idx * chunk_size;
@@ -194,6 +200,14 @@ int compression(char* input_data, const size_t in_bytes) {
             return -1;
         }
     }
+
+    CUDA_CHECK(cudaEventRecord(stop_o, 0));
+    CUDA_CHECK(cudaEventSynchronize(stop_o));
+    CUDA_CHECK(cudaEventElapsedTime(&gpuTime, start_o, stop_o));
+
+    std::cout << "GPU compression time: " << gpuTime << " ms\n";
+    float gpuThroughput = (in_bytes / (1024.0f * 1024.0f)) / (gpuTime / 1000.0f);
+    std::cout << "GPU Throughput: " << gpuThroughput << " MB/s\n";
 
     // Cleanup stream
     CUDA_CHECK(cudaStreamSynchronize(stream));
