@@ -44,7 +44,7 @@ void write_file_data(const char* filename, char* data, size_t size)
     file.close();
 }
 
-void compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t stream)
+int compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t stream)
 {
     // Create a CUDA stream
     // cudaStream_t stream;
@@ -131,7 +131,7 @@ void compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t stre
 
     if (comp_res != nvcompSuccess) {
         std::cerr << "GPU compression failed!" << std::endl;
-        return;
+        return -1;
     }
 
     std::cout << "GPU compression time: " << gpuTime << " ms\n";
@@ -170,6 +170,7 @@ void compress_chunk(char* input_data, const size_t chunk_size, cudaStream_t stre
     delete[] compressed_data;
     // CUDA_CHECK(cudaStreamSynchronize(stream));
     // CUDA_CHECK(cudaStreamDestroy(stream));
+    return 0;
 }
 
 int compression(char* input_data, const size_t in_bytes) {
