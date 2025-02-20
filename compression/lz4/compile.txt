@@ -1,0 +1,14 @@
+
+(Cuda 11)
+sudo apt install nvidia-driver-450
+
+sudo apt install nvidia-utils-535
+
+sudo apt update
+sudo apt install liblz4-dev
+
+g++ -o cpu_comp cpu_comp.cpp -llz4
+
+nvcc -o gpu_comp gpu_comp.cu -I/usr/include/nvcomp -L/usr/lib/x86_64-linux-gnu -lnvcomp
+
+cut -d '|' -f 16 lineitem10.tbl > lineitem10.txt
