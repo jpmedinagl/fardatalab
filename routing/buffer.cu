@@ -34,7 +34,7 @@ int main()
     CUDA_CHECK(cudaMemcpy(d_src, h_src, SIZE * sizeof(int), cudaMemcpyHostToDevice));
 
     // Set up GPU 1
-    CUDA_CHECK(cudaSetDevice(1), "Set GPU 1");
+    CUDA_CHECK(cudaSetDevice(1));
     CUDA_CHECK(cudaMalloc((void **)&d_dst, SIZE * sizeof(int)));
 
     
