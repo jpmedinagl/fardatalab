@@ -1,0 +1,4 @@
+WARNING: In nvcompBatchedGdeflateCompressGetTempSize: Might not have enough memory available on this GPU.
+    Require 16.905 GB but detected only 1.6178 GB available
+API call failure "cudaMalloc(&d_comp_temp, comp_temp_bytes)" with 2 at /users/jpmedina/CUDALibrarySamples/nvCOMP/benchmarks/benchmark_template_chunked.cuh:486
+terminate called without an active exception

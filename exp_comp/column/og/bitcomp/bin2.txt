@@ -1,0 +1,6 @@
+----------
+files: 1
+uncompressed (B): 47991984
+comp_size: 93764, compressed ratio: 511.8381
+compression throughput (GB/s): 159.3105
+decompression throughput (GB/s): 217.1976

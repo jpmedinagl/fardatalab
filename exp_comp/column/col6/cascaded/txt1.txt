@@ -1,0 +1,3 @@
+ERROR: Input data must have a length and chunk size that are a multiple of 4, the size of the specified data type.
+terminate called after throwing an instance of 'std::runtime_error'
+  what():  ERROR: Invalid input data

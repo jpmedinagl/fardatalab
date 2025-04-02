@@ -1,0 +1,2 @@
+API call failure "cudaMalloc(&d_comp_temp, comp_temp_bytes)" with 2 at /users/jpmedina/CUDALibrarySamples/nvCOMP/benchmarks/benchmark_template_chunked.cuh:486
+terminate called without an active exception
