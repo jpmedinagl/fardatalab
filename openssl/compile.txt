@@ -1,0 +1,1 @@
+gcc https_request.c -o https_request -lssl -lcrypto
