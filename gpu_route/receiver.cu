@@ -1,6 +1,6 @@
 #include "utils.h"
 
-void get(gpu_worker* worker, void* data, size_t size)
+void get(gpu_worker_t* worker, void* data, size_t size)
 {
     ucp_request_param_t params;
     memset(&params, 0, sizeof(params));

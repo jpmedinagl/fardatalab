@@ -26,7 +26,7 @@
     do {                                                                       \
         if (_cond) {                                                           \
             printf("Failed to %s\n", _msg);                                    \
-            exit(EXIT_FAILURE);                                                           \
+            exit(EXIT_FAILURE);                                                \
         }                                                                      \
     } while (0)
 
