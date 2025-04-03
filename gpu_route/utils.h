@@ -15,7 +15,7 @@
 
 #include <stdio.h>
 
-#define BUFFER_SIZE 2048
+#define BUFFER_SIZE 512
 #define PORT 12345
 
 #ifndef UCP_FEATURE_CUDA
@@ -55,7 +55,7 @@ typedef struct {
     ucp_ep_h ep;
     ucp_mem_h memh;
     void* gpu_buffer;
-    int buffer_size;
+    size_t buffer_size;
     ucp_address_t* remote_worker_addr;
     size_t remote_worker_addr_len;
     uintptr_t* remote_buffer_addr;
@@ -67,10 +67,6 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     // Initialize worker and gpu buffer + register memory
     CUDA_CHECK(cudaSetDevice(gpu_id));
     worker->gpu_id = gpu_id;
-
-    CUDA_CHECK(cudaMalloc(&worker->gpu_buffer, BUFFER_SIZE));
-    worker->buffer_size = BUFFER_SIZE;
-    printf("GPU %d buffer address: %p\n", gpu_id, worker->gpu_buffer);
 
     ucp_params_t params;
     memset(&params, 0, sizeof(params));
@@ -88,13 +84,14 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
 
     ucp_mem_map_params_t mem_params;
     memset(&mem_params, 0, sizeof(mem_params));
-    mem_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+    mem_params.field_mask = 
+                        // UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
                           UCP_MEM_MAP_PARAM_FIELD_LENGTH |
                           UCP_MEM_MAP_PARAM_FIELD_FLAGS |
                           UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
-    mem_params.address = worker->gpu_buffer;
-    mem_params.length = worker->buffer_size;
-    mem_params.flags = UCP_MEM_MAP_FIXED; // UCP_MEM_MAP_ALLOCATE;
+    // mem_params.address = worker->gpu_buffer;
+    mem_params.length = BUFFER_SIZE;
+    mem_params.flags = UCP_MEM_MAP_ALLOCATE;
     mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
 
     UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
@@ -108,6 +105,12 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
 
     printf("Registered memory: %p, size: %zu, type: %d\n",
         attr.address, attr.length, attr.mem_type);
+
+    worker->gpu_buffer = attr.address;
+    worker->buffer_size = attr.length;
+
+    // CUDA_CHECK(cudaMalloc(&worker->gpu_buffer, BUFFER_SIZE));
+    printf("GPU %d buffer address: %p (%zu)\n", gpu_id, worker->gpu_buffer, worker->buffer_size);
 
     return 0;
 }
