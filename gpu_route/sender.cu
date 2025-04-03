@@ -54,11 +54,17 @@ int main()
     close(sockfd);
     
     // Put random data on GPU
-    char init_data[BUFFER_SIZE] = "Hello from GPU!";
-    CUDA_CHECK(cudaMemcpy(worker.gpu_buffer, init_data, BUFFER_SIZE, cudaMemcpyHostToDevice));
+    char data[BUFFER_SIZE];
+    memset(data, 0, BUFFER_SIZE);
+    strncpy(data, "Hello from GPU!", BUFFER_SIZE - 1);
+
+    // CUDA_CHECK(cudaMalloc(&worker.gpu_buffer, BUFFER_SIZE));
+    printf("GPU buffer allocated at %p\n", worker.gpu_buffer);
+
+    CUDA_CHECK(cudaMemcpy(worker.gpu_buffer, data, BUFFER_SIZE, cudaMemcpyHostToDevice));
     put(&worker, worker.gpu_buffer, BUFFER_SIZE);
     
-    printf("Send: %.*s\n", BUFFER_SIZE, init_data);
+    printf("Send: %.*s\n", BUFFER_SIZE, data);
 
     return 0;
 }
