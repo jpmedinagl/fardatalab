@@ -66,9 +66,11 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
 {   
     // Initialize worker and gpu buffer + register memory
     CUDA_CHECK(cudaSetDevice(gpu_id));
+    worker->gpu_id = gpu_id;
 
     CUDA_CHECK(cudaMalloc(&worker->gpu_buffer, BUFFER_SIZE));
     worker->buffer_size = BUFFER_SIZE;
+    printf("GPU %d buffer address: %p\n", gpu_id, worker->gpu_buffer);
 
     ucp_params_t params;
     memset(&params, 0, sizeof(params));
@@ -92,11 +94,21 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
                           UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
     mem_params.address = worker->gpu_buffer;
     mem_params.length = worker->buffer_size;
-    mem_params.flags = UCP_MEM_MAP_FIXED;
+    mem_params.flags = UCP_MEM_MAP_FIXED; // UCP_MEM_MAP_ALLOCATE;
     mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
 
     UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
-    
+
+    ucp_mem_attr_t attr = {
+    .field_mask = UCP_MEM_ATTR_FIELD_ADDRESS |
+                 UCP_MEM_ATTR_FIELD_LENGTH |
+                 UCP_MEM_ATTR_FIELD_MEM_TYPE
+    };
+    UCS_CHECK(ucp_mem_query(worker->memh, &attr));
+
+    printf("Registered memory: %p, size: %zu, type: %d\n",
+        attr.address, attr.length, attr.mem_type);
+
     return 0;
 }
 
