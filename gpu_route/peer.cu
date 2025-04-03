@@ -1,4 +1,11 @@
 #include "utils.h"
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <cstdio>
 
 int init_gpu_worker(gpu_worker_t* worker, int gpu_id) 
 {   
@@ -76,10 +83,10 @@ void exchange_addresses(gpu_worker_t* local, int sockfd, int is_initiator) {
     
     // Send/recv address
     if (is_initiator) {
-        socket_send(sockfd, local_address, local_address_length));
+        socket_send(sockfd, local_address, local_address_length);
     } else {
         ucp_address_t* remote_address = (ucp_address_t*)malloc(local_address_length);
-        socket_recv(sockfd, remote_address, local_address_length));
+        socket_recv(sockfd, remote_address, local_address_length);
         
         // Create endpoint to remote worker
         ucp_ep_params_t ep_params;
