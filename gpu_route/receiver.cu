@@ -54,7 +54,7 @@ int main()
     // gpu is ready to get data from other gpu    
     get(&worker, worker.gpu_buffer, BUFFER_SIZE);
     
-    char * host_buf = malloc(BUFFER_SIZE * sizeof(char));
+    char * host_buf = (char *)malloc(BUFFER_SIZE * sizeof(char));
     CUDA_CHECK(cudaMemcpy(host_buf, worker.gpu_buffer, BUFFER_SIZE, cudaMemcpyDeviceToHost));
     printf("Received: %.*s\n", BUFFER_SIZE, host_buf);
     
