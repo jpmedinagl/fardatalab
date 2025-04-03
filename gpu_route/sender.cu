@@ -1,51 +1,35 @@
 #include "utils.h"
 
-void exchange_addresses(gpu_worker_t* local, int sockfd) 
-{
-    // Exchange worker addresses
-    ucp_address_t* local_address;
-    size_t local_address_length;
-    UCS_CHECK(ucp_worker_get_address(local->worker, &local_address, &local_address_length));
-    
-    // Send/recv address length
-    socket_send(sockfd, &local_address_length, sizeof(local_address_length));
-    
-    // Send/recv address
-    socket_send(sockfd, local_address, local_address_length);    
-    
-    ucp_worker_release_address(local->worker, local_address);
-}
-
-void perform_put(gpu_worker_t* worker, void* data, size_t size) 
+void put(gpu_worker_t* worker, void* data, size_t size) 
 {
     ucp_request_param_t params;
     memset(&params, 0, sizeof(params));
     params.op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE;
     params.memory_type = UCS_MEMORY_TYPE_CUDA;
     
-    // In real code, you'd exchange rkey and remote address first
     void* request = ucp_put_nbx(worker->ep,
                                data,
                                size,
-                               (uintptr_t)worker->gpu_buffer, // Remote address
-                               NULL, // Would be rkey in real code
+                               (uintptr_t)worker->remote_buffer_addr,
+                               NULL, // rkey
                                &params);
-    
-    if (UCS_PTR_IS_PTR(request)) {
-        ucs_status_t status;
-        do {
-            ucp_worker_progress(worker->worker);
-            status = ucp_request_check_status(request);
-        } while (status == UCS_INPROGRESS);
-        ucp_request_free(request);
-    } else if (UCS_PTR_IS_ERR(request)) {
+
+    if (UCS_PTR_IS_ERR(request)) {
         printf("PUT failed: %s\n", ucs_status_string(UCS_PTR_STATUS(request)));
-    }
+        exit(1);
+    }    
+
+    ucs_status_t status;
+    do {
+        ucp_worker_progress(worker->worker);
+        status = ucp_request_check_status(request);
+    } while (status == UCS_INPROGRESS);
+    ucp_request_free(request);
 }
 
 int main() 
 {
-    // Sender GPU
+    // Sender GPU - ip ? local host ?
     int gpu_id = 0;
     char peer_ip[] = "127.0.0.1";
 
@@ -66,18 +50,15 @@ int main()
     }
     
     exchange_addresses(&worker, sockfd);
+    // don't need socket anymore since they have exchanged addresses
     close(sockfd);
     
-    // Send data
+    // Put random data on GPU
     char init_data[BUFFER_SIZE] = "Hello from GPU!";
     CUDA_CHECK(cudaMemcpy(worker.gpu_buffer, init_data, BUFFER_SIZE, cudaMemcpyHostToDevice));
-    perform_put(&worker, worker.gpu_buffer, BUFFER_SIZE);
+    put(&worker, worker.gpu_buffer, BUFFER_SIZE);
     
-    
-    // Progress loop
-    while (ucp_worker_progress(worker.worker)) {
-        // Process events until all operations are completed
-    }
+    printf("Send: %.*s\n", BUFFER_SIZE, init_data);
 
     return 0;
 }

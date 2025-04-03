@@ -1,29 +1,30 @@
 #include "utils.h"
 
-void exchange_addresses(gpu_worker_t* local, int sockfd) 
+void get(gpu_worker* worker, void* data, size_t size)
 {
-    // Exchange worker addresses
-    ucp_address_t* local_address;
-    size_t local_address_length;
-    UCS_CHECK(ucp_worker_get_address(local->worker, &local_address, &local_address_length));
-    
-    // Send/recv address length
-    socket_recv(sockfd, &local_address_length, sizeof(local_address_length));
-    
-    // Send/recv address
-    ucp_address_t* remote_address = (ucp_address_t*)malloc(local_address_length);
-    socket_recv(sockfd, remote_address, local_address_length);
-    
-    // Create endpoint to remote worker
-    ucp_ep_params_t ep_params;
-    memset(&ep_params, 0, sizeof(ep_params));
-    ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
-    ep_params.address = remote_address;
-    UCS_CHECK(ucp_ep_create(local->worker, &ep_params, &local->ep));
-    
-    free(remote_address);
-    
-    ucp_worker_release_address(local->worker, local_address);
+    ucp_request_param_t params;
+    memset(&params, 0, sizeof(params));
+    params.op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE;
+    params.memory_type = UCS_MEMORY_TYPE_CUDA;
+
+    void* request = ucp_get_nbx(worker->ep,
+                               data,
+                               size,
+                               (uintptr_t)worker->remote_buffer_addr,
+                               NULL, // rkey
+                               &params);
+
+    if (UCS_PTR_IS_ERR(request)) {
+        printf("GET failed: %s\n", ucs_status_string(UCS_PTR_STATUS(request)));
+        exit(1);
+    }
+
+    ucs_status_t status;
+    do {
+        ucp_worker_progress(worker->worker);
+        status = ucp_request_check_status(request);
+    } while (status == UCS_INPROGRESS);
+    ucp_request_free(request);
 }
 
 int main() 
@@ -47,21 +48,15 @@ int main()
     sockfd = accept(sockfd, NULL, NULL);
     
     exchange_addresses(&worker, sockfd);
+    // don't need socket anymore since they have exchanged addresses
     close(sockfd);
+
+    // gpu is ready to get data from other gpu    
+    get(&worker, worker.gpu_buffer, BUFFER_SIZE);
     
-    char* host_buf = (char*)malloc(BUFFER_SIZE);
-    
-    // Polling loop
-    while (ucp_worker_progress(worker.worker)) {
-        // 1. Check memory periodically
-        CUDA_CHECK(cudaMemcpy(host_buf, worker.gpu_buffer, BUFFER_SIZE, cudaMemcpyDeviceToHost));
-        
-        // 2. Simple pattern verification
-        if (strncmp(host_buf, "Hello", 5) == 0) {
-            printf("Received data: %.*s\n", BUFFER_SIZE, host_buf);
-            break;
-        }
-    }
+    char * host_buf = malloc(BUFFER_SIZE);
+    CUDA_CHECK(cudaMemcpy(host_buf, worker.gpu_buffer, BUFFER_SIZE, cudaMemcpyDeviceToHost));
+    printf("Received: %.*s\n", BUFFER_SIZE, host_buf);
     
     free(host_buf);
 
