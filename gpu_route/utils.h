@@ -37,7 +37,7 @@
     do { \
         ucs_status_t _status = (_expr); \
         if (UCS_OK != _status) { \
-            LOG_ERR("%s failed: %s\n", #_expr, ucs_status_string(_status)); \
+            printf("%s failed: %s\n", #_expr, ucs_status_string(_status)); \
             exit(EXIT_FAILURE); \
         } \
     } while (0)
