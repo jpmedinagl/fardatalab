@@ -135,11 +135,11 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     UCS_CHECK(ucp_worker_get_address(local->worker, &local_worker_addr, &local_worker_len));
     
     // Send to remote worker
-    socket_send(sockfd, &local_address_length, sizeof(local_worker_len));
+    socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
     socket_send(sockfd, local_worker_addr, local_worker_len);
     
-    socket_recv(sockf, &local->remote_worker_addr_len);
-    local->remote_worker_addr = malloc(local->remote_worker_addr_len);
+    socket_recv(sockfd, &local->remote_worker_addr_len, sizeof(local->remote_worker_addr_len));
+    local->remote_worker_addr = (ucp_address_t*)malloc(local->remote_worker_addr_len);
     socket_recv(sockfd, local->remote_worker_addr, local->remote_worker_addr_len);
     
     // Exchange the gpu buffers
@@ -157,5 +157,5 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
     ep_params.address = local->remote_worker_addr;
 
-    status = ucp_ep_create(local->worker, &ep_params, &local->ep);
+    UCS_CHECK(ucp_ep_create(local->worker, &ep_params, &local->ep));
 }
