@@ -10,7 +10,6 @@
 int init_gpu_worker(gpu_worker_t* worker, int gpu_id) 
 {   
     // Initialize worker and gpu buffer + register memory
-
     CUDA_CHECK(cudaSetDevice(gpu_id));
 
     CUDA_CHECK(cudaMalloc(&worker->gpu_buffer, BUFFER_SIZE));
@@ -68,7 +67,8 @@ void socket_recv(int sockfd, void* buffer, size_t size) {
     }
 }
 
-void exchange_addresses(gpu_worker_t* local, int sockfd, int is_initiator) {
+void exchange_addresses(gpu_worker_t* local, int sockfd, int is_initiator) 
+{
     // Exchange worker addresses
     ucp_address_t* local_address;
     size_t local_address_length;
@@ -155,15 +155,14 @@ void run_peer(int gpu_id, const char* peer_ip, int is_initiator) {
     close(sockfd);
     
     if (is_initiator) {
-        // Example: Initiate PUT operation
+        // Send data
         char init_data[BUFFER_SIZE] = "Hello from GPU!";
         CUDA_CHECK(cudaMemcpy(worker.gpu_buffer, init_data, BUFFER_SIZE, cudaMemcpyHostToDevice));
         perform_put(&worker, worker.gpu_buffer, BUFFER_SIZE);
     }
     
     // Progress loop
-    while (1) {
-        ucp_worker_progress(worker.worker);
-        usleep(1000);
+    while (ucp_worker_progress(ucp_worker)) {
+        // Process events until all operations are completed
     }
 }
