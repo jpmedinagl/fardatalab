@@ -47,7 +47,7 @@ int main()
 {
     // Sender GPU
     int gpu_id = 0;
-    char ip = "192.168.1.2";
+    char peer_ip[] = "127.0.0.1";
 
     gpu_worker_t worker;
     init_gpu_worker(&worker, gpu_id);
@@ -75,7 +75,7 @@ int main()
     
     
     // Progress loop
-    while (ucp_worker_progress(ucp_worker)) {
+    while (ucp_worker_progress(worker.worker)) {
         // Process events until all operations are completed
     }
 
