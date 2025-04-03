@@ -1,6 +1,7 @@
 #include <ucp/api/ucp.h>
 #include <cuda_runtime.h>
 #include <ucs/memory/memory_type.h>
+#include <ucp/api/ucp_def.h>
 
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -16,6 +17,10 @@
 
 #define BUFFER_SIZE 2048
 #define PORT 12345
+
+#ifndef UCP_FEATURE_CUDA
+#define UCP_FEATURE_CUDA UCS_BIT(12)
+#endif
 
 #define CHECK_ERROR(_cond, _msg)                                               \
   do {                                                                         \
@@ -67,8 +72,9 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
 
     ucp_params_t params;
     memset(&params, 0, sizeof(params));
-    params.field_mask = UCP_PARAM_FIELD_FEATURES;
+    params.field_mask = UCP_PARAM_FIELD_FEATURES | UCP_PARAM_FIELD_ESTIMATED_NUM_EPS;
     params.features = UCP_FEATURE_RMA | UCP_FEATURE_CUDA;
+    params.estimated_num_eps = 1;
 
     UCS_CHECK(ucp_init(&params, NULL, &worker->context));
 
@@ -79,16 +85,27 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
 
     UCS_CHECK(ucp_worker_create(worker->context, &worker_params, &worker->worker));
 
-    ucp_mem_map_params_t mem_params;
-    memset(&mem_params, 0, sizeof(mem_params));
-    mem_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
-                          UCP_MEM_MAP_PARAM_FIELD_LENGTH |
-                          UCP_MEM_MAP_PARAM_FIELD_FLAGS |
-                          UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
-    mem_params.address = worker->gpu_buffer;
-    mem_params.length = worker->buffer_size;
-    mem_params.flags = UCP_MEM_MAP_ALLOCATE;
-    mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
+    // ucp_mem_map_params_t mem_params;
+    // memset(&mem_params, 0, sizeof(mem_params));
+    // mem_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+    //                       UCP_MEM_MAP_PARAM_FIELD_LENGTH |
+    //                       UCP_MEM_MAP_PARAM_FIELD_FLAGS |
+    //                       UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
+    // mem_params.address = worker->gpu_buffer;
+    // mem_params.length = worker->buffer_size;
+    // mem_params.flags = UCP_MEM_MAP_ALLOCATE;
+    // mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
+
+    ucp_mem_map_params_t mem_params = {
+        .field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                    UCP_MEM_MAP_PARAM_FIELD_LENGTH |
+                    UCP_MEM_MAP_PARAM_FIELD_FLAGS |
+                    UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE,
+        .address = worker->gpu_buffer,
+        .length = worker->buffer_size,
+        .flags = UCP_MEM_MAP_FIXED,  // For pre-allocated GPU memory
+        .memory_type = UCS_MEMORY_TYPE_CUDA  // Explicit CUDA memory type
+    };
 
     UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
     
