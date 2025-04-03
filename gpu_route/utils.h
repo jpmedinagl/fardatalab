@@ -68,7 +68,7 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     ucp_params_t params;
     memset(&params, 0, sizeof(params));
     params.field_mask = UCP_PARAM_FIELD_FEATURES;
-    params.features = UCP_FEATURE_RMA;
+    params.features = UCP_FEATURE_RMA | UCP_FEATURE_CUDA;
 
     UCS_CHECK(ucp_init(&params, NULL, &worker->context));
 
@@ -83,10 +83,12 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     memset(&mem_params, 0, sizeof(mem_params));
     mem_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
                           UCP_MEM_MAP_PARAM_FIELD_LENGTH |
-                          UCP_MEM_MAP_PARAM_FIELD_FLAGS;
+                          UCP_MEM_MAP_PARAM_FIELD_FLAGS |
+                          UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
     mem_params.address = worker->gpu_buffer;
     mem_params.length = worker->buffer_size;
-    mem_params.flags = UCP_MEM_MAP_FIXED;
+    mem_params.flags = UCP_MEM_MAP_ALLOCATE;
+    mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
 
     UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
     
