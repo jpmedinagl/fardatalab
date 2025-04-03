@@ -56,3 +56,63 @@ typedef struct {
     int received;
     void* buffer;
 } packet_t;
+
+int init_gpu_worker(gpu_worker_t* worker, int gpu_id) 
+{   
+    // Initialize worker and gpu buffer + register memory
+    CUDA_CHECK(cudaSetDevice(gpu_id));
+
+    CUDA_CHECK(cudaMalloc(&worker->gpu_buffer, BUFFER_SIZE));
+    worker->buffer_size = BUFFER_SIZE;
+
+    ucp_params_t params;
+    memset(&params, 0, sizeof(params));
+    params.field_mask = UCP_PARAM_FIELD_FEATURES;
+    params.features = UCP_FEATURE_RMA;
+
+    UCS_CHECK(ucp_init(&params, NULL, &worker->context));
+
+    ucp_worker_params_t worker_params;
+    memset(&worker_params, 0, sizeof(worker_params));
+    worker_params.field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE;
+    worker_params.thread_mode = UCS_THREAD_MODE_SINGLE;
+
+    UCS_CHECK(ucp_worker_create(worker->context, &worker_params, &worker->worker));
+
+    ucp_mem_map_params_t mem_params;
+    memset(&mem_params, 0, sizeof(mem_params));
+    mem_params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                          UCP_MEM_MAP_PARAM_FIELD_LENGTH |
+                          UCP_MEM_MAP_PARAM_FIELD_FLAGS;
+    mem_params.address = worker->gpu_buffer;
+    mem_params.length = worker->buffer_size;
+    mem_params.flags = UCP_MEM_MAP_FIXED;
+
+    UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
+    
+    return 0;
+}
+
+void socket_send(int sockfd, const void* data, size_t size) {
+    size_t sent = 0;
+    while (sent < size) {
+        ssize_t res = send(sockfd, (char*)data + sent, size - sent, 0);
+        if (res <= 0) {
+            perror("send failed");
+            exit(1);
+        }
+        sent += res;
+    }
+}
+
+void socket_recv(int sockfd, void* buffer, size_t size) {
+    size_t received = 0;
+    while (received < size) {
+        ssize_t res = recv(sockfd, (char*)buffer + received, size - received, 0);
+        if (res <= 0) {
+            perror("recv failed");
+            exit(1);
+        }
+        received += res;
+    }
+}

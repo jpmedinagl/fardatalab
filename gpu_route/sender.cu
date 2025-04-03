@@ -1,4 +1,4 @@
-#include "peer.cu"
+#include "utils.h"
 
 void exchange_addresses(gpu_worker_t* local, int sockfd) 
 {
