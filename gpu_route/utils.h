@@ -92,7 +92,7 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
                           UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
     mem_params.address = worker->gpu_buffer;
     mem_params.length = worker->buffer_size;
-    mem_params.flags = UCP_MEM_MAP_ALLOCATE;
+    mem_params.flags = UCP_MEM_MAP_FIXED;
     mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
 
     UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
