@@ -1,31 +1,61 @@
-FLAGS := -Wall --std=gnu99 -I/home/juanpmg/ucx-install/include
-PORT := port.mk
-TARGETS := ucx_server ucx_client
-LIBS := -L/home/juanpmg/ucx-install/lib -lucp -lucm -lucs
+# Universal Makefile for UCX+CUDA
 
-debug: FLAGS += -ggdb3 -DDEBUG
+# Compilers
+CC := gcc
+NVCC := nvcc
+
+# Auto-detect UCX paths from ucx_info location
+UCX_PREFIX := $(shell dirname $(shell dirname $(shell which ucx_info)))
+UCX_INCLUDE := $(UCX_PREFIX)/include
+UCX_LIB := $(UCX_PREFIX)/lib
+
+# Auto-detect GPU architecture
+GPU_ARCH := $(shell nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')
+ifeq ($(GPU_ARCH),)
+    $(warning Could not detect GPU architecture, defaulting to sm_70)
+    GPU_ARCH := 70
+endif
+
+# Flags
+CFLAGS := -Wall --std=gnu99 -I$(UCX_INCLUDE)
+NVCCFLAGS := -arch=sm_$(GPU_ARCH) -Xcompiler -fPIC -I$(UCX_INCLUDE)
+LDFLAGS := -L$(UCX_LIB) -lucp -lucm -lucs
+CUDA_LDFLAGS := -lcudart
+
+PORT := port.mk
+TARGETS := server client
+
+# Debug vs Release
+debug: CFLAGS += -ggdb3 -DDEBUG
+debug: NVCCFLAGS += -g -G
 debug: all
 
-release: FLAGS += -O2
+release: CFLAGS += -O2
+release: NVCCFLAGS += -O3
 release: all
 
 all: $(PORT) $(TARGETS)
 
-ucx_server: ucx_server.o ucx_util.o
-	gcc $(FLAGS) -o $@ $^ $(LIBS)
+# GPU targets
+server: server.o util.o
+	$(NVCC) $(NVCCFLAGS) -o $@ $^ $(LDFLAGS) $(CUDA_LDFLAGS)
 
-ucx_client: ucx_client.o ucx_util.o
-	gcc $(FLAGS) -o $@ $^ $(LIBS)
+client: client.o util.o
+	$(NVCC) $(NVCCFLAGS) -o $@ $^ $(LDFLAGS) $(CUDA_LDFLAGS)
 
-%.o: %.c %.h 
-	gcc $(FLAGS) -c $< -o $@
+# Compilation rules
+%.o: %.cu
+	$(NVCC) $(NVCCFLAGS) -dc $< -o $@
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(PORT):
-	@echo "Generating a new default port number in $@"
-	@awk 'BEGIN{srand();printf("FLAGS += -DDEFAULT_PORT=%d", 55536*rand()+10000)}' > $(PORT)
+	@echo "Generating default port number"
+	@awk 'BEGIN{srand();printf("CFLAGS += -DDEFAULT_PORT=%d", 55536*rand()+10000)}' > $@
 
 .PHONY: all clean debug release
 clean:
-	rm -f *.o ucx_server ucx_client $(PORT)
+	rm -f *.o $(TARGETS) $(PORT)
 
 include $(PORT)

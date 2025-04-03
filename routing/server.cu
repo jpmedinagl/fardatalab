@@ -4,6 +4,7 @@
 #include <arpa/inet.h> /* inet_addr */
 #include <unistd.h>    /* getopt */
 #include <stdlib.h>    /* atoi */
+#include <iostream>
 
 #include "utils.h"
 
@@ -11,6 +12,10 @@
 #define PORT_STRING_LEN 8
 
 #define AM_ID 0
+
+#ifndef DEFAULT_PORT
+#define DEFAULT_PORT 13337
+#endif
 
 #define CLIENT_SERVER_SEND_RECV_AM UCS_BIT(2)
 #define send_recv_type CLIENT_SERVER_SEND_RECV_AM
@@ -66,7 +71,7 @@ int ucx_server_init(ucx_server_t *server)
     // initalize worker 
     int ret = worker_init(server->ucp_context, &(server->ucp_worker));
     if (ret != 0) {
-        ucx_server_cleanup(server);
+        // ucx_server_cleanup(server);
         return -1;
     }
     
