@@ -51,3 +51,8 @@ typedef struct {
     int buffer_size;
     int gpu_id;
 } gpu_worker_t;
+
+typedef struct {
+    int received;
+    void* buffer;
+} packet_t;
