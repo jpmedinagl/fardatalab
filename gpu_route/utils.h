@@ -9,6 +9,8 @@
 #include <stdlib.h>     // For exit()
 #include <string.h>     // For memset()
 #include <cstdio>       // For perror()
+#include <ucp/api/ucp.h>
+#include <ucs/type/status.h>
 
 #include <stdio.h>
 
@@ -30,6 +32,15 @@
       printf("%s failed: %s\n", #_func, cudaGetErrorString(_result));         \
     }                                                                          \
   } while (0)
+
+#define UCS_CHECK(_expr) \
+    do { \
+        ucs_status_t _status = (_expr); \
+        if (UCS_OK != _status) { \
+            LOG_ERR("%s failed: %s\n", #_expr, ucs_status_string(_status)); \
+            exit(EXIT_FAILURE); \
+        } \
+    } while (0)
 
 typedef struct {
     ucp_context_h context;

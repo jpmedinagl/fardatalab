@@ -123,7 +123,7 @@ void perform_put(gpu_worker_t* worker, void* data, size_t size) {
         } while (status == UCS_INPROGRESS);
         ucp_request_free(request);
     } else if (UCS_PTR_IS_ERR(request)) {
-        LOG_ERR("PUT failed: %s\n", ucs_status_string(UCS_PTR_STATUS(request)));
+        printf("PUT failed: %s\n", ucs_status_string(UCS_PTR_STATUS(request)));
     }
 }
 
