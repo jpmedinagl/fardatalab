@@ -221,6 +221,27 @@ int server_create_ep(ucp_worker_h data_worker,
     return 0;
 }
 
+int register_gpu_memory(ucp_context_h context, void *d_ptr, size_t size, ucp_mem_h *memh) 
+{
+    ucp_mem_map_params_t params;
+    ucs_status_t status;
+
+    memset(&params, 0, sizeof(params));
+    params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                       UCP_MEM_MAP_PARAM_FIELD_LENGTH |
+                       UCP_MEM_MAP_PARAM_FIELD_FLAGS;
+    params.address = d_ptr;
+    params.length = size;
+    params.flags = UCP_MEM_MAP_FIXED | UCP_MEM_MAP_ALLOCATE;
+
+    status = ucp_mem_map(context, &params, memh);
+    if (status != UCS_OK) {
+        fprintf(stderr, "failed to register GPU memory (%s)\n", ucs_status_string(status));
+        return -1;
+    }
+    return 0;
+}
+
 /**
  * Handles received Active Messages (AM) data. Part of the ucp callback. 
  * Allocates the total size from header, and copies full message.  
@@ -235,23 +256,29 @@ ucs_status_t recv_am_data_cb(void *arg, const void *header, size_t header_length
 
     if (param->recv_attr & UCP_AM_RECV_ATTR_FLAG_RNDV) {
         char *d_path;
-        cudaMalloc((void **)&d_path, expected_length + 1);
+        CUDA_CHECK(cudaMalloc((void **)&d_path, length + 1));
 
         cudaMemcpy(d_path, data, expected_length, cudaMemcpyDeviceToDevice);
 
-        char null_char = '\0';
-        cudaMemcpy(d_path + expected_length, &null_char, 1, cudaMemcpyHostToDevice);
+        conn_data->am_data.packet = (char *)data;
 
-        conn_data->am_data.packet = d_path;
+        char *h_path = (char *)malloc(length + 1);
+        CUDA_CHECK(cudaMemcpy(h_path, data, length, cudaMemcpyDeviceToHost));
+        h_path[length] = '\0';
+        
+        printf("\nReceived GPU data: %s (%ld bytes)\n", h_path, length);
+        free(h_path);
     } else {
-        // Copy to CPU memory
-        memcpy(conn_data->am_data.packet, data, expected_length);
-        conn_data->am_data.packet[expected_length] = '\0';  // Null-terminate the string
+        CUDA_CHECK(cudaMalloc((void **)&conn_data->am_data.packet, length + 1));
+        CUDA_CHECK(cudaMemcpy(conn_data->am_data.packet, data, length, cudaMemcpyHostToDevice));
 
-        printf("\nReceived data: %s (%ld)\n", conn_data->am_data.packet, expected_length);
+        printf("\nReceived CPU data: %s (%ld bytes)\n", (char *)data, length);
     }
 
-    // Operation as complete
+    char null_char = '\0';
+    CUDA_CHECK(cudaMemcpy(conn_data->am_data.packet + length, &null_char, 1, cudaMemcpyHostToDevice));
+
+    // Operation is complete
     conn_data->am_data.complete = 1;
 
     return UCS_OK;

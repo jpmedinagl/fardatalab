@@ -218,6 +218,26 @@ void send_callback(void *request, ucs_status_t status, void *user_data)
     ucp_request_free(request);
 }
 
+int register_gpu_memory(ucp_context_h context, void *d_ptr, size_t size, ucp_mem_h *memh) {
+    ucp_mem_map_params_t params;
+    ucs_status_t status;
+
+    memset(&params, 0, sizeof(params));
+    params.field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                       UCP_MEM_MAP_PARAM_FIELD_LENGTH |
+                       UCP_MEM_MAP_PARAM_FIELD_FLAGS;
+    params.address = d_ptr;
+    params.length = size;
+    params.flags = UCP_MEM_MAP_FIXED | UCP_MEM_MAP_ALLOCATE;
+
+    status = ucp_mem_map(context, &params, memh);
+    if (status != UCS_OK) {
+        fprintf(stderr, "failed to register GPU memory (%s)\n", ucs_status_string(status));
+        return -1;
+    }
+    return 0;
+}
+
 /**
  * Sends an active message to the specified endpoint with a length-prefixed header.  
  * Uses send_callback to handle completion and returns the operation status.  
@@ -237,6 +257,7 @@ ucs_status_t send_am_data(ucp_worker_h ucp_worker, ucp_ep_h ep, const char *msg,
                          UCP_OP_ATTR_FIELD_USER_DATA;
     param.cb.send      = send_callback;
     param.user_data    = NULL;
+    param.memory_type = UCS_MEMORY_TYPE_CUDA;
 
     /* Create a header containing the message length */
     size_t header = msg_length;
@@ -402,14 +423,28 @@ int main(int argc, char **argv)
     port = DEFAULT_PORT;
     path = argv[2];
 
+    CUDA_CHECK(cudaMalloc((void **)&d_path, strlen(path) + 1));
+    CUDA_CHECK(cudaMemcpy(d_path, path, strlen(path), cudaMemcpyHostToDevice));
+    char null_char = '\0';
+    CUDA_CHECK(cudaMemcpy(d_path + strlen(path), &null_char, 1, cudaMemcpyHostToDevice));
+
     ret = ucx_client_init(&client);
     if (ret != 0) {
         fprintf(stderr, "failed to initilize client\n");
         return -1;
     }
 
+    ret = register_gpu_memory(client.ucp_context, d_path, strlen(path) + 1, &client.ucp_memh);
+    if (ret != 0) {
+        ucx_client_cleanup(&client);
+        cudaFree(d_path);
+        return -1;
+    }
+
     ret = ucx_client_run(&client, server_addr, port, path);
     ucx_client_cleanup(&client);
+
+    cudaFree(d_path);
 
     return ret;
 }

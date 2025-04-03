@@ -19,11 +19,13 @@ typedef struct ucx_client {
     ucp_context_h ucp_context;
     ucp_worker_h ucp_worker;
     ucp_ep_h ucp_ep;
+    ucp_mem_h ucp_memh;
 } ucx_client_t;
 
 typedef struct ucx_server {
     ucp_context_h ucp_context;
     ucp_worker_h ucp_worker;
+    ucp_mem_h ucp_memh;
 } ucx_server_t;
 
 typedef struct ucx_connection {
@@ -40,6 +42,8 @@ typedef struct {
     ucp_ep_h ep;
     am_data_desc_t am_data;
 } connection_data_t;
+
+int register_gpu_memory(ucp_context_h context, void *d_ptr, size_t size, ucp_mem_h *memh);
 
 /**
  * Closes a UCX endpoint with the specified flags.  
