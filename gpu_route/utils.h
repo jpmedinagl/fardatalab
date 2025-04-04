@@ -13,6 +13,8 @@
 #include <ucp/api/ucp.h>
 #include <ucs/type/status.h>
 
+#include <inttypes.h>
+
 #include <stdio.h>
 
 #define BUFFER_SIZE 512
@@ -122,7 +124,7 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     return 0;
 }
 
-// // Basic socket send, loop to ensure full data transfer
+// Basic socket send, loop to ensure full data transfer
 void socket_send(int sockfd, const void* data, size_t size) {
     size_t sent = 0;
     while (sent < size) {
@@ -156,6 +158,9 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     size_t local_worker_len;
     UCS_CHECK(ucp_worker_get_address(local->worker, &local_worker_addr, &local_worker_len));
     
+    uint64_t addr_header = *((uint64_t*)local_worker_addr);
+    printf("Worker address: 0x%" PRIx64 " (%zu)\n", addr_header, local_worker_len);
+    
     // Send to remote worker
     socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
     socket_send(sockfd, local_worker_addr, local_worker_len);
@@ -163,11 +168,16 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     socket_recv(sockfd, &local->remote_worker_addr_len, sizeof(local->remote_worker_addr_len));
     local->remote_worker_addr = (ucp_address_t*)malloc(local->remote_worker_addr_len);
     socket_recv(sockfd, local->remote_worker_addr, local->remote_worker_addr_len);
+
+    uint64_t remote_addr_header = *((uint64_t*)local->remote_worker_addr);
+    printf("Worker address: 0x%" PRIx64 " (%zu)\n", remote_addr_header, local->remote_worker_addr_len);
     
     // Exchange the gpu buffers
     uintptr_t local_buf_addr = (uintptr_t)local->gpu_buffer;
+    printf("Sending  local buffer address: 0x%016" PRIxPTR "\n", local_buf_addr);
     socket_send(sockfd, &local_buf_addr, sizeof(uintptr_t));
     socket_recv(sockfd, &local->remote_buffer_addr, sizeof(uintptr_t));
+    printf("Received remote buffer address: 0x%016" PRIxPTR "\n", local->remote_buffer_addr);
 
     // Key exchange not done
     
