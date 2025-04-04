@@ -182,18 +182,20 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     printf("Received remote buffer address: 0x%016" PRIxPTR "\n", local->remote_buffer_addr);
 
     // Key exchange
-    ucp_rkey_h local_rkey;
-    ucp_mem_attr_t mem_attr = {
-        .field_mask = UCP_MEM_ATTR_FIELD_RKEY
-    };
-    UCS_CHECK(ucp_mem_query(local->memh, &mem_attr));
-    UCS_CHECK(ucp_rkey_unpack(local->context, mem_attr.rkey, &local_rkey));
+    // ucp_rkey_h local_rkey;
+    // ucp_mem_attr_t mem_attr = {
+    //     .field_mask = UCP_MEM_ATTR_FIELD_RKEY
+    // };
+    // UCS_CHECK(ucp_mem_query(local->memh, &mem_attr));
+    // UCS_CHECK(ucp_rkey_unpack(local->context, mem_attr.rkey, &local_rkey));
 
     // Send rkey
     size_t rkey_size;
-    void *rkey_buffer = ucp_rkey_pack(local->context, local_rkey, &rkey_size);
+    UCS_CHECK(ucp_rkey_pack(local->context, local->memh, &rkey_buffer, &rkey_size));
+    printf("Packed rkey size: %zu\n", rkey_size);
     socket_send(sockfd, &rkey_size, sizeof(rkey_size));
     socket_send(sockfd, rkey_buffer, rkey_size);
+    ucp_rkey_buffer_release(rkey_buffer);
 
     // Receive rkey
     size_t remote_rkey_size;
@@ -201,6 +203,7 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     void *remote_rkey_buffer = malloc(remote_rkey_size);
     socket_recv(sockfd, remote_rkey_buffer, remote_rkey_size);
     UCS_CHECK(ucp_ep_rkey_unpack(local->ep, remote_rkey_buffer, &local->remote_rkey));
+    free(remote_rkey_buffer);
 
     printf("Local rkey size: %zu, Remote rkey size: %zu\n", 
        rkey_size, remote_rkey_size);
