@@ -64,7 +64,9 @@ int main()
     CUDA_CHECK(cudaMemcpy(worker.gpu_buffer, data, BUFFER_SIZE, cudaMemcpyHostToDevice));
     put(&worker, worker.gpu_buffer, BUFFER_SIZE);
     
-    printf("Send: %.*s\n", BUFFER_SIZE, data);
+    printf("\n");
+    printf("GPU %d (sender)\n", worker.gpu_id);
+    printf("Sent: %.*s\n", BUFFER_SIZE, data);
 
     return 0;
 }
