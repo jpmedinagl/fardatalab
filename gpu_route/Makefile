@@ -4,13 +4,21 @@ UCX_PATH ?= /home/jpmedina/opt/ucx
 UCX_LDFLAGS = -L$(UCX_PATH)/lib -Xlinker -rpath -Xlinker $(UCX_PATH)/lib
 UCX_CPPFLAGS = -I$(UCX_PATH)/include
 
+DEBUG ?= 0
+
+ifeq ($(DEBUG),1)
+    LOG_LEVEL_FLAGS = -DLOG_LEVEL=3
+else
+    LOG_LEVEL_FLAGS = -DLOG_LEVEL=0
+endif
+
 all: sender receiver
 
 sender: sender.cu utils.h
-	nvcc -o sender sender.cu $(UCX_CPPFLAGS) $(UCX_LDFLAGS) -lucp -lucs -lcudart
+	nvcc -o sender sender.cu $(LOG_LEVEL_FLAGS) $(UCX_CPPFLAGS) $(UCX_LDFLAGS) -lucp -lucs -lcudart
 
 receiver: receiver.cu utils.h
-	nvcc -o receiver receiver.cu $(UCX_CPPFLAGS) $(UCX_LDFLAGS) -lucp -lucs -lcudart
+	nvcc -o receiver receiver.cu $(LOG_LEVEL_FLAGS) $(UCX_CPPFLAGS) $(UCX_LDFLAGS) -lucp -lucs -lcudart
 
 clean:
 	rm -f sender receiver
