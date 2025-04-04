@@ -142,7 +142,7 @@ void register_memory(gpu_worker_t* worker)
     worker->gpu_buffer = attr.address;
     worker->buffer_size = attr.length;
 
-    LOG_DEBUG("GPU %d buffer address: %p (%zu)", gpu_id, worker->gpu_buffer, worker->buffer_size);
+    LOG_DEBUG("GPU %d buffer address: %p (%zu)", worker->gpu_id, worker->gpu_buffer, worker->buffer_size);
 
     // cudaPointerAttributes attributes;
     // CUDA_CHECK(cudaPointerGetAttributes(&attributes, worker->gpu_buffer));
