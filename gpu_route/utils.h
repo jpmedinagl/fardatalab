@@ -58,11 +58,18 @@ typedef struct {
     // ucp_rkey_h remote_rkey; -> add key later once it works
 } gpu_worker_t;
 
+static void * buffer = NULL;
+
 int init_gpu_worker(gpu_worker_t* worker, int gpu_id) 
 {   
     // Initialize worker and gpu buffer + register memory
     CUDA_CHECK(cudaSetDevice(gpu_id));
     worker->gpu_id = gpu_id;
+
+    // CUDA_CHECK(cudaMalloc(&buffer, BUFFER_SIZE));
+    // buffer = malloc(BUFFER_SIZE);
+    worker->buffer_size = BUFFER_SIZE;
+    printf("GPU %d buffer address: %p (%zu)\n", gpu_id, buffer, worker->buffer_size);
 
     ucp_params_t params;
     memset(&params, 0, sizeof(params));
@@ -85,9 +92,9 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
                           UCP_MEM_MAP_PARAM_FIELD_LENGTH |
                           UCP_MEM_MAP_PARAM_FIELD_FLAGS |
                           UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
-    // mem_params.address = worker->gpu_buffer;
+    // mem_params.address = buffer;
     mem_params.length = BUFFER_SIZE;
-    mem_params.flags = UCP_MEM_MAP_ALLOCATE;
+    mem_params.flags = UCP_MEM_MAP_ALLOCATE; // | UCP_MEM_MAP_FIXED; // | UCP_MEM_MAP_NONBLOCK;
     mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
 
     UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
@@ -108,10 +115,16 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     // CUDA_CHECK(cudaMalloc(&worker->gpu_buffer, BUFFER_SIZE));
     printf("GPU %d buffer address: %p (%zu)\n", gpu_id, worker->gpu_buffer, worker->buffer_size);
 
+    cudaPointerAttributes attributes;
+    CUDA_CHECK(cudaPointerGetAttributes(&attributes, worker->gpu_buffer));
+
+    printf("%d %d\n", attributes.device, attributes.type);
+
+
     return 0;
 }
 
-// Basic socket send, loop to ensure full data transfer
+// // Basic socket send, loop to ensure full data transfer
 void socket_send(int sockfd, const void* data, size_t size) {
     size_t sent = 0;
     while (sent < size) {
