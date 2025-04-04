@@ -66,11 +66,6 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     CUDA_CHECK(cudaSetDevice(gpu_id));
     worker->gpu_id = gpu_id;
 
-    // CUDA_CHECK(cudaMalloc(&buffer, BUFFER_SIZE));
-    // buffer = malloc(BUFFER_SIZE);
-    worker->buffer_size = BUFFER_SIZE;
-    printf("GPU %d buffer address: %p (%zu)\n", gpu_id, buffer, worker->buffer_size);
-
     ucp_params_t params;
     memset(&params, 0, sizeof(params));
     params.field_mask = UCP_PARAM_FIELD_FEATURES; 
@@ -87,14 +82,13 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
 
     ucp_mem_map_params_t mem_params;
     memset(&mem_params, 0, sizeof(mem_params));
-    mem_params.field_mask = 
-                        // UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+    mem_params.field_mask = // UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
                           UCP_MEM_MAP_PARAM_FIELD_LENGTH |
                           UCP_MEM_MAP_PARAM_FIELD_FLAGS |
                           UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE;
     // mem_params.address = buffer;
     mem_params.length = BUFFER_SIZE;
-    mem_params.flags = UCP_MEM_MAP_ALLOCATE; // | UCP_MEM_MAP_FIXED; // | UCP_MEM_MAP_NONBLOCK;
+    mem_params.flags = UCP_MEM_MAP_ALLOCATE;
     mem_params.memory_type = UCS_MEMORY_TYPE_CUDA;
 
     UCS_CHECK(ucp_mem_map(worker->context, &mem_params, &worker->memh));
@@ -112,14 +106,18 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     worker->gpu_buffer = attr.address;
     worker->buffer_size = attr.length;
 
-    // CUDA_CHECK(cudaMalloc(&worker->gpu_buffer, BUFFER_SIZE));
     printf("GPU %d buffer address: %p (%zu)\n", gpu_id, worker->gpu_buffer, worker->buffer_size);
 
     cudaPointerAttributes attributes;
     CUDA_CHECK(cudaPointerGetAttributes(&attributes, worker->gpu_buffer));
 
-    printf("%d %d\n", attributes.device, attributes.type);
+    const char* mem_type_str =
+    attributes.type == cudaMemoryTypeDevice  ? "Device" :
+    attributes.type == cudaMemoryTypeHost    ? "Host (Pinned)" :
+    attributes.type == cudaMemoryTypeManaged ? "Managed" :
+                                               "Unknown";
 
+    printf("Pointer type: %s (device: %d)\n", mem_type_str, attributes.device);
 
     return 0;
 }
