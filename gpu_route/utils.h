@@ -18,10 +18,6 @@
 #define BUFFER_SIZE 512
 #define PORT 12345
 
-#ifndef UCP_FEATURE_CUDA
-#define UCP_FEATURE_CUDA UCS_BIT(12)
-#endif
-
 #define CHECK_ERROR(_cond, _msg)                                               \
     do {                                                                       \
         if (_cond) {                                                           \
