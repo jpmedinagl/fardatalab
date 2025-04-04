@@ -191,7 +191,7 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
 
     // Send rkey
     size_t rkey_size;
-    void *rkey_buffer = malloc(rkey_size);
+    void *rkey_buffer;
     UCS_CHECK(ucp_rkey_pack(local->context, local->memh, &rkey_buffer, &rkey_size));
     printf("Packed rkey size: %zu\n", rkey_size);
     socket_send(sockfd, &rkey_size, sizeof(rkey_size));
