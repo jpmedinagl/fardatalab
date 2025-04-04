@@ -11,7 +11,7 @@ void put(gpu_worker_t* worker, void* data, size_t size)
                                data,
                                size,
                                (uintptr_t)worker->remote_buffer_addr,
-                               NULL, // rkey
+                               local->remote_key,
                                &params);
 
     if (UCS_PTR_IS_ERR(request)) {

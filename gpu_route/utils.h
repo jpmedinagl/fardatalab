@@ -57,7 +57,7 @@ typedef struct {
     ucp_address_t* remote_worker_addr;
     size_t remote_worker_addr_len;
     uintptr_t* remote_buffer_addr;
-    // ucp_rkey_h remote_rkey; -> add key later once it works
+    ucp_rkey_h remote_rkey;
 } gpu_worker_t;
 
 static void * buffer = NULL;
@@ -164,6 +164,8 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     // Send to remote worker
     socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
     socket_send(sockfd, local_worker_addr, local_worker_len);
+
+    ucp_worker_release_address(local->worker, local_worker_addr);
     
     socket_recv(sockfd, &local->remote_worker_addr_len, sizeof(local->remote_worker_addr_len));
     local->remote_worker_addr = (ucp_address_t*)malloc(local->remote_worker_addr_len);
@@ -179,9 +181,32 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     socket_recv(sockfd, &local->remote_buffer_addr, sizeof(uintptr_t));
     printf("Received remote buffer address: 0x%016" PRIxPTR "\n", local->remote_buffer_addr);
 
-    // Key exchange not done
-    
-    ucp_worker_release_address(local->worker, local_worker_addr);
+    // Key exchange
+    ucp_rkey_h local_rkey;
+    ucp_mem_attr_t mem_attr = {
+        .field_mask = UCP_MEM_ATTR_FIELD_RKEY
+    };
+    UCS_CHECK(ucp_mem_query(local->memh, &mem_attr));
+    UCS_CHECK(ucp_rkey_unpack(local->context, mem_attr.rkey, &local_rkey));
+
+    // Send rkey
+    size_t rkey_size;
+    void *rkey_buffer = ucp_rkey_pack(local->context, local_rkey, &rkey_size);
+    socket_send(sockfd, &rkey_size, sizeof(rkey_size));
+    socket_send(sockfd, rkey_buffer, rkey_size);
+
+    // Receive rkey
+    size_t remote_rkey_size;
+    socket_recv(sockfd, &remote_rkey_size, sizeof(remote_rkey_size));
+    void *remote_rkey_buffer = malloc(remote_rkey_size);
+    socket_recv(sockfd, remote_rkey_buffer, remote_rkey_size);
+    UCS_CHECK(ucp_ep_rkey_unpack(local->ep, remote_rkey_buffer, &local->remote_rkey));
+
+    printf("Local rkey size: %zu, Remote rkey size: %zu\n", 
+       rkey_size, remote_rkey_size);
+
+    free(rkey_buffer);
+    free(remote_rkey_buffer);
 
     ucp_ep_params_t ep_params;
     memset(&ep_params, 0, sizeof(ep_params));
