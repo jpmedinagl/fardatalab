@@ -35,6 +35,12 @@ int main()
 
     gpu_worker_t worker;
     init_gpu_worker(&worker, gpu_id);
+
+    // Put random data on GPU
+    char data[BUFFER_SIZE];
+    memset(data, 0, BUFFER_SIZE);
+    strncpy(data, "Hello from GPU!", BUFFER_SIZE - 1);
+    CUDA_CHECK(cudaMemcpy(worker.gpu_buffer, data, BUFFER_SIZE, cudaMemcpyHostToDevice));
     
     // Socket setup
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -50,18 +56,10 @@ int main()
     }
     
     exchange_addresses(&worker, sockfd);
-    // don't need socket anymore since they have exchanged addresses
-    close(sockfd);
-    
-    // Put random data on GPU
-    char data[BUFFER_SIZE];
-    memset(data, 0, BUFFER_SIZE);
-    strncpy(data, "Hello from GPU!", BUFFER_SIZE - 1);
 
     // CUDA_CHECK(cudaMalloc(&worker.gpu_buffer, BUFFER_SIZE));
-    printf("GPU buffer allocated at %p\n", worker.gpu_buffer);
+    // printf("GPU buffer allocated at %p\n", worker.gpu_buffer);
 
-    CUDA_CHECK(cudaMemcpy(worker.gpu_buffer, data, BUFFER_SIZE, cudaMemcpyHostToDevice));
     put(&worker, worker.gpu_buffer, BUFFER_SIZE);
     
     printf("\n");

@@ -48,8 +48,6 @@ int main()
     sockfd = accept(sockfd, NULL, NULL);
     
     exchange_addresses(&worker, sockfd);
-    // don't need socket anymore since they have exchanged addresses
-    close(sockfd);
 
     // gpu is ready to get data from other gpu    
     get(&worker, worker.gpu_buffer, BUFFER_SIZE);

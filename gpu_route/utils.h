@@ -60,10 +60,34 @@ typedef struct {
     ucp_rkey_h remote_rkey;
 } gpu_worker_t;
 
-static void * buffer = NULL;
+// Basic socket send, loop to ensure full data transfer
+void socket_send(int sockfd, const void* data, size_t size) {
+    size_t sent = 0;
+    while (sent < size) {
+        ssize_t res = send(sockfd, (char*)data + sent, size - sent, 0);
+        if (res <= 0) {
+            perror("send failed");
+            exit(1);
+        }
+        sent += res;
+    }
+}
 
-int init_gpu_worker(gpu_worker_t* worker, int gpu_id) 
-{   
+// Basic socket recv, loop to ensure full data transfer
+void socket_recv(int sockfd, void* buffer, size_t size) {
+    size_t received = 0;
+    while (received < size) {
+        ssize_t res = recv(sockfd, (char*)buffer + received, size - received, 0);
+        if (res <= 0) {
+            perror("recv failed");
+            exit(1);
+        }
+        received += res;
+    }
+}
+
+void init_worker(gpu_worker_t* worker, int gpu_id)
+{
     // Initialize worker and gpu buffer + register memory
     CUDA_CHECK(cudaSetDevice(gpu_id));
     worker->gpu_id = gpu_id;
@@ -81,7 +105,10 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     worker_params.thread_mode = UCS_THREAD_MODE_SINGLE;
 
     UCS_CHECK(ucp_worker_create(worker->context, &worker_params, &worker->worker));
+}
 
+void register_memory(gpu_worker_t* worker)
+{
     ucp_mem_map_params_t mem_params;
     memset(&mem_params, 0, sizeof(mem_params));
     mem_params.field_mask = // UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
@@ -108,7 +135,7 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
     worker->gpu_buffer = attr.address;
     worker->buffer_size = attr.length;
 
-    printf("GPU %d buffer address: %p (%zu)\n", gpu_id, worker->gpu_buffer, worker->buffer_size);
+    printf("GPU %d buffer address: %p (%zu)\n", worker->gpu_id, worker->gpu_buffer, worker->buffer_size);
 
     cudaPointerAttributes attributes;
     CUDA_CHECK(cudaPointerGetAttributes(&attributes, worker->gpu_buffer));
@@ -120,34 +147,13 @@ int init_gpu_worker(gpu_worker_t* worker, int gpu_id)
                                                "Unknown";
 
     printf("Pointer type: %s (device: %d)\n", mem_type_str, attributes.device);
+}
 
+int init_gpu_worker(gpu_worker_t* worker, int gpu_id) 
+{   
+    init_worker(worker, gpu_id);
+    register_memory(worker);
     return 0;
-}
-
-// Basic socket send, loop to ensure full data transfer
-void socket_send(int sockfd, const void* data, size_t size) {
-    size_t sent = 0;
-    while (sent < size) {
-        ssize_t res = send(sockfd, (char*)data + sent, size - sent, 0);
-        if (res <= 0) {
-            perror("send failed");
-            exit(1);
-        }
-        sent += res;
-    }
-}
-
-// Basic socket recv, loop to ensure full data transfer
-void socket_recv(int sockfd, void* buffer, size_t size) {
-    size_t received = 0;
-    while (received < size) {
-        ssize_t res = recv(sockfd, (char*)buffer + received, size - received, 0);
-        if (res <= 0) {
-            perror("recv failed");
-            exit(1);
-        }
-        received += res;
-    }
 }
 
 // Exchange addresses of ucp workers and buffers and create an endpoint
@@ -205,11 +211,11 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     socket_recv(sockfd, remote_rkey_buffer, remote_rkey_size);
     printf("Rkey recv: %p %zu\n", remote_rkey_buffer, remote_rkey_size);
     UCS_CHECK(ucp_ep_rkey_unpack(local->ep, remote_rkey_buffer, &local->remote_rkey));
-    printf("Unpacking...\n");
 
     printf("Local rkey size: %zu, Remote rkey size: %zu\n", 
        rkey_size, remote_rkey_size);
 
     // free(rkey_buffer);
     free(remote_rkey_buffer);
+    close(sockfd);
 }
