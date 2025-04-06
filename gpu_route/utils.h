@@ -219,3 +219,13 @@ void exchange_addresses(gpu_worker_t* local, int sockfd)
     free(remote_rkey_buffer);
     close(sockfd);
 }
+
+void gpu_worker_teardown(gpu_worker_t* worker) {
+    if (worker->remote_rkey) ucp_rkey_destroy(worker->remote_rkey);
+    if (worker->ep) ucp_ep_destroy(worker->ep);
+    if (worker->memh) ucp_mem_unmap(worker->context, worker->memh);
+    if (worker->worker) ucp_worker_destroy(worker->worker);
+    if (worker->context) ucp_cleanup(worker->context);
+    if (worker->remote_worker_addr) free(worker->remote_worker_addr);
+    if (worker->gpu_buffer) cudaFree(worker->gpu_buffer);
+}

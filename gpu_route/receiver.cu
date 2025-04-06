@@ -43,6 +43,10 @@ int main()
     addr.sin_port = htons(PORT);
     
     addr.sin_addr.s_addr = INADDR_ANY;
+    
+    int optval = 1;
+    setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval));
+
     bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
     listen(sockfd, 1);
     sockfd = accept(sockfd, NULL, NULL);
@@ -50,7 +54,8 @@ int main()
     exchange_addresses(&worker, sockfd);
 
     // gpu is ready to get data from other gpu    
-    get(&worker, worker.gpu_buffer, BUFFER_SIZE);
+    // get(&worker, worker.gpu_buffer, BUFFER_SIZE);
+    sleep(1);
     
     printf("\n");
     printf("GPU %d (receiver)\n", worker.gpu_id);
@@ -60,6 +65,8 @@ int main()
     printf("Received: %.*s\n", BUFFER_SIZE, host_buf);
     
     free(host_buf);
+
+    gpu_worker_teardown(&worker);
 
     return 0;
 }

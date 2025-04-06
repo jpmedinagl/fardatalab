@@ -60,11 +60,15 @@ int main()
     // CUDA_CHECK(cudaMalloc(&worker.gpu_buffer, BUFFER_SIZE));
     // printf("GPU buffer allocated at %p\n", worker.gpu_buffer);
 
+    // sleep(0.5);
+
     put(&worker, worker.gpu_buffer, BUFFER_SIZE);
     
     printf("\n");
     printf("GPU %d (sender)\n", worker.gpu_id);
     printf("Sent: %.*s\n", BUFFER_SIZE, data);
+
+    gpu_worker_teardown(&worker);
 
     return 0;
 }
