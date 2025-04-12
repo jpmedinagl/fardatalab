@@ -29,6 +29,6 @@ public:
     ucp_mem_h memh, ucp_address_t* remote_worker, ucp_rkey_h remote_rkey);
 
     void enqueue_remote(void* data, size_t size);
-}
+};
 
 #endif // SENDER_H

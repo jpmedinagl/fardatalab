@@ -17,6 +17,6 @@ public:
     ucp_mem_h memh, ucp_address_t* remote_worker, ucp_rkey_h remote_rkey);
 
     void dequeue(void * out_chunk);
-}
+};
 
 #endif // RECEIVER_H
