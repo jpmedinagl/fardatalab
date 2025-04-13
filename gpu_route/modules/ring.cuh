@@ -31,9 +31,7 @@ public:
     __device__ bool is_empty() const;
     __device__ bool is_full() const; 
     __device__ bool dequeue(void* out_chunk);
-
-    // ring buffer never enqueues data, remote sender does
-    // __device__ bool enqueue(const void * chunk);
+    __device__ bool enqueue(const void * chunk);
 };
 
 #endif // RING_BUFFER_H

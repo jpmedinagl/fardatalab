@@ -28,6 +28,24 @@ bool RingBuffer::is_full() const {
 }
 
 __device__ 
+bool RingBuffer::enqueue(const void* data) {
+    if (is_full()) {
+        return false;
+    }
+
+    memcpy(tail, data, CHUNK_SIZE);
+
+    uintptr_t offset = (reinterpret_cast<uintptr_t>(tail) - 
+                        reinterpret_cast<uintptr_t>(buffer) + CHUNK_SIZE) % 
+                        (size * CHUNK_SIZE);
+    tail = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + offset);
+
+    count--;
+    return true;
+}
+
+
+__device__ 
 bool RingBuffer::dequeue(void* out_chunk) {
     if (is_empty()) {
         return false;
