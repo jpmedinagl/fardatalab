@@ -25,20 +25,32 @@ void Sender::process_req(void* request)
     ucp_request_free(request);
 }
 
-void Sender::enqueue_remote(void* data, size_t size) 
+bool Sender::push(void* data, size_t size) {
+    bool success;
+    push_kernel<<<1,1>>>(d_ringbuf, data, size, &success);
+    cudaDeviceSynchronize();
+    return success;
+}
+
+void Sender::remote_push() 
 {
     if (!remote_tail || !remote_head) {
         std::cerr << "Remote head or tail is null. Cannot enqueue data." << std::endl;
     }
 
+    // 0. get the data we are sending from our local send buffer
+    void* local_head;
+    get_head_kernel<<<1,1>>>(d_ringbuf, &local_head);
+    cudaDeviceSynchronize();
+
     // fetch the current head ? and check the count ?
 
     // 1. new tail position
-    uintptr_t new_offset = ((uintptr_t)remote_info.tail_value - 
-                            (uintptr_t)remote_info.buffer_base + CHUNK_SIZE) %
-                            (remote_info.capacity * CHUNK_SIZE);
+    uintptr_t new_offset = ((uintptr_t)remote_tail - 
+                            (uintptr_t)remote_buf + CHUNK_SIZE) %
+                            (size * CHUNK_SIZE);
     
-    void* new_tail = (void*)((uintptr_t)remote_info.buffer_base + new_offset);
+    void* new_tail = (void*)((uintptr_t)remote_buf + new_offset);
 
     // 2. update REMOTE tail pointer first
     ucp_request_param_t tail_params = {
@@ -64,8 +76,8 @@ void Sender::enqueue_remote(void* data, size_t size)
 
     void* put_req = ucp_put_nbx(
         ep,
-        data,
-        size,
+        local_head,
+        CHUNK_SIZE,
         (uintptr_t)remote_tail,
         remote_rkey,
         &put_params
@@ -74,4 +86,12 @@ void Sender::enqueue_remote(void* data, size_t size)
 
     // 4. update local reference of the tail
     remote_tail = new_tail;
+}
+
+__global__ void push_kernel(RingBuffer* rb, void* data, size_t size, bool* success) {
+    *success = rb->enqueue(data, size);
+}
+
+__global__ void get_head_kernel(RingBuffer* rb, void** head) {
+    *head = rb->head;
 }
