@@ -9,15 +9,17 @@ class Sender {
 private:
     ucp_context_h context;
     ucp_worker_h worker;
-    ucp_ep_h ep;
-    ucp_mem_h memh;
 
     RingBuffer * d_ringbuf;
 
-    ucp_address_t* remote_worker;
+    // needs to keep track of the next things for every single gpu...?
+
+    ucp_ep_h ep;
+    ucp_mem_h memh;
+
+    // ucp_address_t* remote_worker;
     ucp_rkey_h remote_rkey;
 
-    // needs to keep track of this for every single gpu...?
     void * remote_buf;
     void ** remote_head_ptr;
     void * remote_head;
@@ -29,7 +31,7 @@ private:
 
 public:
     Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
-    ucp_mem_h memh, ucp_address_t* remote_worker, ucp_rkey_h remote_rkey);
+    ucp_mem_h memh, ucp_rkey_h remote_rkey);
 
     bool push(void * data, size_t size);
 
