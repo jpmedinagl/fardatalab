@@ -36,20 +36,11 @@ Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
 
 void Receiver::dequeue(void* out_chunk) 
 {
-    char* d_tmp;
-    cudaMalloc(&d_tmp, CHUNK_SIZE);
-    
+    // dequeue from ring buffer
     bool success = false;
-    dequeue_kernel<<<1, 1>>>(d_ringbuf, d_tmp, &success);
+    dequeue_kernel<<<1, 1>>>(d_ringbuf, out_chunk, &success);
 
-    char host_data[CHUNK_SIZE + 1] = {0};
-
-    if (success) {
-        cudaMemcpy(host_buffer, d_tmp, CHUNK_SIZE, cudaMemcpyDeviceToHost);
-        
-        host_buffer[CHUNK_SIZE] = '\0';
-        std::cout << "Dequeued: " << host_buffer << std::endl;
-    } else {
+    if (!success) {
         std::cout << "Buffer empty" << std::endl;
     }
 }
