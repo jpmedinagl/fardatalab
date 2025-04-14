@@ -32,8 +32,9 @@ bool Sender::push(void* data, size_t size) {
     return success;
 }
 
-void Sender::remote_push() 
-{
+void Sender::remote_push(int gpu_id) 
+{   
+    (void *) gpu_id;
     if (!remote_tail || !remote_head) {
         std::cerr << "Remote head or tail is null. Cannot enqueue data." << std::endl;
     }
