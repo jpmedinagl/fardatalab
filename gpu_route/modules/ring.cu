@@ -9,7 +9,7 @@ RingBuffer::RingBuffer(void* buf, size_t num_chunks)
 RingBufferRemoteInfo RingBuffer::export_metadata() const {
     return {
         buffer,
-        &head,
+        // &head,
         &tail,
         head,
         tail,
