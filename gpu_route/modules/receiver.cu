@@ -7,15 +7,34 @@ __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_
     new (rb) RingBuffer(buffer, num_chunks);
 }
 
+void Receiver::send_addr(int sockfd)
+{
+    // 1. send key
+    size_t rkey_size;
+    void *rkey_buffer;
+    UCS_CHECK(ucp_rkey_pack(context, memh, &rkey_buffer, &rkey_size));
+    
+    printf("Rkey send: %p %zu\n", rkey_buffer, rkey_size);
+
+    socket_send(sockfd, &rkey_size, sizeof(rkey_size));
+    socket_send(sockfd, rkey_buffer, rkey_size);
+    ucp_rkey_buffer_release(rkey_buffer);
+
+    // 2. send ring buffer information
+    RingBufferRemoteInfo buf = d_ringbuf.export_metadata();
+    socket_send(sockfd, &buf, sizeof(buf));        
+}
+
 Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
-                   ucp_mem_h memh)
-    : context(ctx), worker(wrk), ep(endpoint), memh(memh) 
+                   int sockfd)
+    : context(ctx), worker(wrk), ep(endpoint)
 {    
-    // 1. allocate buffer 
+    // 1. allocate buffer
     void* gpu_buffer;
     const size_t total_size = sizeof(RingBuffer) + (NUM_CHUNKS + CHUNK_SIZE);
     cudaMalloc(&gpu_memory, total_size);
 
+    // 2. map memory
     ucp_mem_map_params_t params = {
         .field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
                       UCP_MEM_MAP_PARAM_FIELD_LENGTH |
@@ -32,6 +51,8 @@ Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
 
     init_ringbuffer_kernel<<<1, 1>>>(d_ringbuf, gpu_buffer, num_chunks);
     cudaDeviceSynchronize();
+
+    send_addr(sockfd);
 }
 
 void Receiver::dequeue(void* out_chunk) 
