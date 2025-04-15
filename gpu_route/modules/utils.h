@@ -120,7 +120,7 @@ void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep)
     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
     ep_params.address = remote_worker_addr;
 
-    UCS_CHECK(ucp_ep_create(worker, &ep_params, &ep));
+    UCS_CHECK(ucp_ep_create(worker, &ep_params, ep));
 
     printf("Endpoint created.");
 }

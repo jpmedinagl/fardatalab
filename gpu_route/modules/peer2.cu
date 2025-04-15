@@ -28,7 +28,7 @@ int main()
 
     // exchange addresses + keys!
 
-    create_ep(sockfd, &ep);
+    create_ep(sockfd, worker, &ep);
 
     Receiver receiver(context, worker, ep, sockfd);
 

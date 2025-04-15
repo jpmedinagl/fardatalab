@@ -29,7 +29,7 @@ int main()
 
     // create ep
 
-    create_ep(sockfd, &ep);
+    create_ep(sockfd, worker, &ep);
 
     // define different chunks to send
     void* gpu_chunks[NUM_CHUNKS];
@@ -49,7 +49,7 @@ int main()
     Sender sender(context, worker, ep, sockfd);
 
     printf("Sender connected\n");
-    
+
     // for (int i = 0; i < NUM_CHUNKS; i++) {
     //     sender.push(gpu_chunks[i], CHUNK_SIZE);
     //     printf("Enqueued chunk %d\n", i);
