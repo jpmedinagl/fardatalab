@@ -49,6 +49,23 @@ void Sender::recv_addr(int sockfd)
     printf("size: %p\n", size);
 }
 
+void Sender::send_addr(int sockfd)
+{
+    // 1. send key
+    size_t rkey_size;
+    void *rkey_buffer;
+    UCS_CHECK(ucp_rkey_pack(context, memh, &rkey_buffer, &rkey_size));
+    
+    printf("Rkey send: %p %zu\n", rkey_buffer, rkey_size);
+
+    socket_send(sockfd, &rkey_size, sizeof(rkey_size));
+    socket_send(sockfd, rkey_buffer, rkey_size);
+    ucp_rkey_buffer_release(rkey_buffer);
+
+    // 2. send tmp_debug pointer
+    socket_send(sockfd, &tmp_debug, sizeof(tmp_debug));
+}
+
 Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockfd)
     : context(ctx), worker(wrk), ep(endpoint)
 {
@@ -62,7 +79,22 @@ Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockf
     init_ringbuffer_kernel<<<1, 1>>>(this->d_ringbuf, data_buffer, NUM_CHUNKS);
     cudaDeviceSynchronize();
 
+    uintptr_t tmp_debug;
+    cudaMalloc(&tmp_debug, sizeof(uintptr_t));
+
+    // 2. map memory
+    ucp_mem_map_params_t params = {
+        .field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
+                      UCP_MEM_MAP_PARAM_FIELD_LENGTH |
+                      UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE,
+        .address = reinterpret_cast<void*>(tmp_debug),
+        .length = sizeof(uintptr_t),
+        .memory_type = UCS_MEMORY_TYPE_CUDA
+    };
+    UCS_CHECK(ucp_mem_map(context, &params, &memh));
+
     recv_addr(sockfd);
+    send_addr(sockfd);
 }
 
 void Sender::process_req(void* request) 
@@ -116,7 +148,7 @@ void Sender::remote_push(int gpu_id)
     uintptr_t new_offset = (remote_tail - remote_buf + CHUNK_SIZE) %
                             (size * CHUNK_SIZE);
     
-    void* new_tail = (void*)(remote_buf + new_offset);
+    uintptr_t new_tail = (remote_buf + new_offset);
 
     printf("old tail: %p\n", remote_tail);
     printf("new tail: %p\n", new_tail);
@@ -140,6 +172,24 @@ void Sender::remote_push(int gpu_id)
 
     printf("tail written\n");
 
+    // DEBUG: CHECK VALUE OF TAIL
+    
+    ucp_request_param_t get_params = {
+        .op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE,
+        .memory_type = UCS_MEMORY_TYPE_CUDA
+    };
+    void *get_req = ucp_get_nbx(
+        ep,
+        &tmp_debug,
+        sizeof(uintptr_t),      // Size of data (pointer)
+        remote_tail_ptr,        // Remote address for the tail pointer
+        remote_rkey,            // Remote key for access
+        &get_params             // Additional params
+    );
+    process_req(get_req);
+
+    printf("get tail: %p\n", (void*)tmp_debug);
+
     // 3. write data to old tail position
     ucp_request_param_t put_params = {
         .op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE,
@@ -157,6 +207,13 @@ void Sender::remote_push(int gpu_id)
     process_req(put_req);
 
     printf("data placed\n");
+
+    // ucp_request_param_t flush_params = {
+    //     .op_attr_mask = UCP_OP_ATTR_FIELD_FLAGS,
+    //     .flags = 0
+    // };
+    // void* flush_req = ucp_worker_flush_nbx(worker, &flush_params);
+    // process_req(flush_req);
 
     // 4. update local reference of the tail
     remote_tail = (uintptr_t)new_tail;

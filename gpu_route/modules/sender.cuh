@@ -14,8 +14,10 @@ private:
     ucp_worker_h worker;
 
     // ring buffer is registered for rdma
-    ucp_mem_h memh;
     RingBuffer * d_ringbuf;
+
+    ucp_mem_h memh;
+    uintptr_t tmp_debug;
 
     // needs to keep track of the next things for every single gpu...?
     ucp_ep_h ep;
@@ -33,6 +35,7 @@ private:
     void process_req(void * request);
 
     void recv_addr(int sockfd);
+    void send_addr(int sockfd);
 
 public:
     Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockfd);

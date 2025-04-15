@@ -68,6 +68,25 @@ void Receiver::send_addr(int sockfd)
     printf("size: %p\n\n", meta.size);
 }
 
+void Receiver::recv_addr(int sockfd)
+{
+    // 1. receive remote key
+    size_t remote_rkey_size;
+    socket_recv(sockfd, &remote_rkey_size, sizeof(remote_rkey_size));
+
+    void *remote_rkey_buffer = malloc(remote_rkey_size);
+    socket_recv(sockfd, remote_rkey_buffer, remote_rkey_size);
+
+    printf("Rkey recv: %p %zu\n", remote_rkey_buffer, remote_rkey_size);
+
+    UCS_CHECK(ucp_ep_rkey_unpack(ep, remote_rkey_buffer, &remote_rkey));
+
+    free(remote_rkey_buffer);
+
+    // 2. receive ring buffer information
+    // ?
+}
+
 Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
                    int sockfd)
     : context(ctx), worker(wrk), ep(endpoint)
