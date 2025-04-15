@@ -9,12 +9,14 @@ LIBS = -lucp -lucs -lcudart
 
 all: peer1 peer2
 
-peer1: peer1.cu utils.h sender.cu sender.cuh ring.cuh
-	$(NVCC) -o $@ $< sender.cu ring.cu $(UCX_CPPFLAGS) $(UCX_LDFLAGS) $(LIBS)
+peer1: peer1.o sender.o ring.o utils.o
+	$(NVCC) -o $@ $^ $(UCX_CPPFLAGS) $(UCX_LDFLAGS) $(LIBS)
 
-peer2: peer2.cu utils.h receiver.cu receiver.cuh ring.cuh
-	$(NVCC) -o $@ $< receiver.cu ring.cu $(UCX_CPPFLAGS) $(UCX_LDFLAGS) $(LIBS)
+peer2: peer2.o receiver.o ring.o utils.o
+	$(NVCC) -o $@ $^ $(UCX_CPPFLAGS) $(UCX_LDFLAGS) $(LIBS)
 
+%.o: %.cu
+	$(NVCC) -c -o $@ $< $(UCX_CPPFLAGS)
 
 clean:
 	rm -f peer1 peer2
