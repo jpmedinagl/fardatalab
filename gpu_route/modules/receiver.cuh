@@ -1,6 +1,7 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
 
+#include "utils.h"
 #include "ring.cuh"
 
 class Receiver {

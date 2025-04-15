@@ -1,6 +1,7 @@
 #include "receiver.cuh"
 
 #include <iostream>
+#include <new>
 
 __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_chunks) 
 {
