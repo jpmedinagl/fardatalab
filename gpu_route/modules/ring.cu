@@ -1,6 +1,6 @@
 #include "ring.h"
 
-RingBuffer::RingBuffer(void* buf, size_t num_chunks)
+__device__ RingBuffer::RingBuffer(void* buf, size_t num_chunks)
     : buffer(buf), size(num_chunks), count(0) {
     head = buf;
     tail = buf;

@@ -16,14 +16,13 @@ struct RingBufferRemoteInfo {
 };
 
 class RingBuffer {
-private:
+public:
     void * buffer;
     void * head;
     void * tail;
     size_t size;
     size_t count;
 
-public:
     RingBuffer(void * buf, size_t num_chunks);
 
     RingBufferRemoteInfo export_metadata() const;
