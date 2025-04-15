@@ -55,7 +55,7 @@ void socket_send(int sockfd, const void* data, size_t size);
 // Basic socket recv, loop to ensure full data transfer
 void socket_recv(int sockfd, void* buffer, size_t size);
 
-void init(ucp_context_h context, ucp_worker_h worker);
+void init(ucp_context_h * context, ucp_worker_h * worker);
 
 void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep);
 

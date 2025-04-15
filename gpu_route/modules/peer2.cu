@@ -9,11 +9,11 @@ int main()
 
     CUDA_CHECK(cudaSetDevice(1));
 
-    init(context, worker);
+    init(&context, &worker);
     
     // Socket setup
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    
+
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -28,6 +28,8 @@ int main()
     sockfd = accept(sockfd, NULL, NULL);
 
     // exchange addresses + keys!
+
+    printf("socked connected\n");
 
     create_ep(sockfd, worker, &ep);
 

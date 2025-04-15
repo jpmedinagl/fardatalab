@@ -25,31 +25,35 @@ void socket_recv(int sockfd, void* buffer, size_t size) {
     }
 }
 
-void init(ucp_context_h context, ucp_worker_h worker)
+void init(ucp_context_h * context, ucp_worker_h * worker)
 {
     ucp_params_t params = {
         .field_mask = UCP_PARAM_FIELD_FEATURES,
         .features = UCP_FEATURE_RMA
     };
     
-    UCS_CHECK(ucp_init(&params, NULL, &context));
+    UCS_CHECK(ucp_init(&params, NULL, context));
 
     ucp_worker_params_t worker_params = {
         .field_mask = UCP_WORKER_PARAM_FIELD_THREAD_MODE,
         .thread_mode = UCS_THREAD_MODE_SINGLE
     };
 
-    UCS_CHECK(ucp_worker_create(context, &worker_params, &worker));
+    UCS_CHECK(ucp_worker_create(*context, &worker_params, worker));
 }
 
 void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep)
-{
+{   
+    printf("creating ep...\n");
+
     ucp_address_t* local_worker_addr;
     size_t local_worker_len;
     UCS_CHECK(ucp_worker_get_address(worker, &local_worker_addr, &local_worker_len));
     
     uint64_t addr_header = *((uint64_t*)local_worker_addr);
     printf("Worker address: %p (%zu)\n", addr_header, local_worker_len);
+
+    exit(1);
     
     // Send to remote worker
     socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));

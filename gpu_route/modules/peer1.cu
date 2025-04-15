@@ -9,7 +9,7 @@ int main()
 
     CUDA_CHECK(cudaSetDevice(0));
 
-    init(context, worker);
+    init(&context, &worker);
     
     // Socket setup
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
@@ -24,6 +24,8 @@ int main()
         perror("connect failed");
         exit(1);
     }
+
+    printf("socked connected\n");
 
     // exchange addresses + keys !
     // this is done for testing only
