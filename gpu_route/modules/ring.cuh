@@ -34,7 +34,7 @@ public:
             tail,
             size
         };
-    }
+    };
 
     __device__ void init(void* buf, size_t num_chunks) {
         buffer = buf;
@@ -42,16 +42,18 @@ public:
         tail = buf;
         size = num_chunks + 1;
         count = 0;
-    }
+    };
 
     __device__ bool is_empty() const {
         return count == 0;
-    }
+    };
+
     __device__ bool is_full() const {
         return count == size;
-    }
+    };
 
-    __device__ bool enqueue(const void * chunk) if (is_full()) {
+    __device__ bool enqueue(const void * chunk) {
+        if (is_full()) {
             return false;
         }
 
@@ -81,6 +83,7 @@ public:
 
         count--;
         return true;
-    }
+    };
+}
 
 #endif // RING_BUFFER_H
