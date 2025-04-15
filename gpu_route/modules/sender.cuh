@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "ring.cuh"
+
 class Sender {
 private:
     ucp_context_h context;
@@ -29,9 +31,10 @@ private:
 
     void process_req(void * request);
 
+    void recv_addr(int sockfd);
+
 public:
-    Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
-    ucp_mem_h memh, ucp_rkey_h remote_rkey);
+    Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockfd);
 
     bool push(void * data, size_t size);
 

@@ -1,11 +1,50 @@
 #include "sender.cuh"
 
-Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint)
-    : context(ctx), worker(wrk), ep(endpoint), 
-      remote_worker(nullptr), remote_rkey(nullptr),
-      remote_head(nullptr), remote_tail(nullptr) 
+__global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_chunks) 
 {
-    std::cout << "Sender object created." << std::endl;
+    new (rb) RingBuffer(buffer, num_chunks);
+}
+
+void Sender::recv_addr(int sockfd)
+{
+    // 1. receive remote key
+    size_t remote_rkey_size;
+    socket_recv(sockfd, &remote_rkey_size, sizeof(remote_rkey_size));
+
+    void *remote_rkey_buffer = malloc(remote_rkey_size);
+    socket_recv(sockfd, remote_rkey_buffer, remote_rkey_size);
+
+    printf("Rkey recv: %p %zu\n", remote_rkey_buffer, remote_rkey_size);
+
+    UCS_CHECK(ucp_ep_rkey_unpack(ep, remote_rkey_buffer, &remote_rkey));
+
+    free(remote_rkey_buffer);
+
+    // 2. receive ring buffer information
+    RingBufferRemoteInfo buf;
+    socket_recv(sockfd, &buf, sizeof(buf));
+
+    remote_buf = buf.buffer_addr;
+    remote_tail_ptr = buf.tail_addr_ptr;
+    remote_head = buf.head_addr;
+    remote_tail = buf.tail_addr;
+    size = buf.size;
+}
+
+Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockfd)
+    : context(ctx), worker(wrk), ep(endpoint)
+{
+    // sender doesn't need to register own ring buffer
+    // 1. allocate ring buffer
+    cudaMalloc(&this->d_ringbuf, sizeof(RingBuffer));
+    
+    void* data_buffer;
+    cudaMalloc(&data_buffer, NUM_CHUNKS * CHUNK_SIZE);
+
+    init_ringbuffer_kernel<<<1, 1>>>(this->d_ringbuf, data_buffer, NUM_CHUNKS);
+    cudaDeviceSynchronize();
+
+    recv_addr(sockfd)
 }
 
 void Sender::process_req(void* request) 
