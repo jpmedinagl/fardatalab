@@ -7,7 +7,7 @@
 #define CHUNK_SIZE 256
 
 struct RingBufferRemoteInfo {
-    uintptr_t buffer_addr;
+    void * buffer_addr;
     // void ** head_addr_ptr;
     void ** tail_addr_ptr;
     void * head_addr;
