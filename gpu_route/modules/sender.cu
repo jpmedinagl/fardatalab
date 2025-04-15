@@ -79,16 +79,16 @@ Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockf
     init_ringbuffer_kernel<<<1, 1>>>(this->d_ringbuf, data_buffer, NUM_CHUNKS);
     cudaDeviceSynchronize();
 
-    uintptr_t tmp_debug;
-    cudaMalloc(&tmp_debug, sizeof(uintptr_t));
+    // uintptr_t tmp_debug;
+    cudaMalloc(&tmp_debug, sizeof(void *));
 
     // 2. map memory
     ucp_mem_map_params_t params = {
         .field_mask = UCP_MEM_MAP_PARAM_FIELD_ADDRESS |
                       UCP_MEM_MAP_PARAM_FIELD_LENGTH |
                       UCP_MEM_MAP_PARAM_FIELD_MEMORY_TYPE,
-        .address = reinterpret_cast<void*>(tmp_debug),
-        .length = sizeof(uintptr_t),
+        .address = tmp_debug,
+        .length = sizeof(void *),
         .memory_type = UCS_MEMORY_TYPE_CUDA
     };
     UCS_CHECK(ucp_mem_map(context, &params, &memh));
@@ -181,7 +181,7 @@ void Sender::remote_push(int gpu_id)
     void *get_req = ucp_get_nbx(
         ep,
         &tmp_debug,
-        sizeof(uintptr_t),      // Size of data (pointer)
+        sizeof(void *),      // Size of data (pointer)
         remote_tail_ptr,        // Remote address for the tail pointer
         remote_rkey,            // Remote key for access
         &get_params             // Additional params

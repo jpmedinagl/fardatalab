@@ -17,7 +17,7 @@ private:
     RingBuffer * d_ringbuf;
 
     ucp_mem_h memh;
-    uintptr_t tmp_debug;
+    void* tmp_debug;
 
     // needs to keep track of the next things for every single gpu...?
     ucp_ep_h ep;
