@@ -94,6 +94,15 @@ void Sender::remote_push(int gpu_id)
     get_head_kernel<<<1,1>>>(d_ringbuf, &local_head);
     cudaDeviceSynchronize();
 
+    char* host_chunk = (char*)malloc(CHUNK_SIZE);
+    cudaMemcpy(host_chunk, local_head, CHUNK_SIZE, cudaMemcpyDeviceToHost);
+    printf("Chunk contents (first 64 bytes):\n");
+    for (int i = 0; i < std::min(CHUNK_SIZE, 64); ++i) {
+        printf("%c", host_chunk[i]);
+    }
+    printf("\n");
+    free(host_chunk);
+
     // fetch the current head ? and check the count ?
 
     // 1. new tail position
@@ -101,6 +110,9 @@ void Sender::remote_push(int gpu_id)
                             (size * CHUNK_SIZE);
     
     void* new_tail = (void*)(remote_buf + new_offset);
+
+    printf("old tail: %p\n", remote_tail);
+    printf("new tail: %p\n", new_tail);
 
     // 2. update REMOTE tail pointer first
     ucp_request_param_t tail_params = {
@@ -118,6 +130,8 @@ void Sender::remote_push(int gpu_id)
     );
     process_req(tail_req);
 
+    printf("tail written\n");
+
     // 3. write data to old tail position
     ucp_request_param_t put_params = {
         .op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE,
@@ -133,6 +147,8 @@ void Sender::remote_push(int gpu_id)
         &put_params
     );
     process_req(put_req);
+
+    print("data placed\n");
 
     // 4. update local reference of the tail
     remote_tail = (uintptr_t)new_tail;
