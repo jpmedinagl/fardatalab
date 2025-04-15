@@ -53,13 +53,13 @@ void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep)
     uint64_t addr_header = *((uint64_t*)local_worker_addr);
     printf("Worker address: %p (%zu)\n", addr_header, local_worker_len);
 
-    exit(1);
+    // exit(1);
     
     // Send to remote worker
     socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
     socket_send(sockfd, local_worker_addr, local_worker_len);
 
-    ucp_worker_release_address(worker, local_worker_addr);
+    UCS_CHECK(ucp_worker_release_address(worker, local_worker_addr));
 
     ucp_address_t* remote_worker_addr;
     size_t remote_worker_len;
@@ -79,5 +79,5 @@ void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep)
 
     UCS_CHECK(ucp_ep_create(worker, &ep_params, ep));
 
-    printf("Endpoint created.");
+    printf("Endpoint created.\n");
 }

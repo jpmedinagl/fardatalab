@@ -25,7 +25,7 @@ void Receiver::send_addr(int sockfd)
 
     socket_send(sockfd, &rkey_size, sizeof(rkey_size));
     socket_send(sockfd, rkey_buffer, rkey_size);
-    ucp_rkey_buffer_release(rkey_buffer);
+    UCS_CHECK(ucp_rkey_buffer_release(rkey_buffer));
 
     // 2. send ring buffer information
     RingBufferRemoteInfo buf = d_ringbuf->export_metadata();
@@ -50,7 +50,7 @@ Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
         .length = total_size,
         .memory_type = UCS_MEMORY_TYPE_CUDA
     };
-    ucp_mem_map(context, &params, &memh);
+    UCS_CHECK(ucp_mem_map(context, &params, &memh));
 
     // 3. intialize ring buffer
     d_ringbuf = reinterpret_cast<RingBuffer*>(gpu_memory);
