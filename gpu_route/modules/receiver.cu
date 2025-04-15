@@ -37,7 +37,7 @@ Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
     : context(ctx), worker(wrk), ep(endpoint)
 {    
     // 1. allocate buffer
-    void* gpu_buffer;
+    void* gpu_memory;
     const size_t total_size = sizeof(RingBuffer) + (NUM_CHUNKS + CHUNK_SIZE);
     cudaMalloc(&gpu_memory, total_size);
 
@@ -56,7 +56,7 @@ Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
     d_ringbuf = reinterpret_cast<RingBuffer*>(gpu_memory);
     void* data_buffer = reinterpret_cast<char*>(gpu_memory) + sizeof(RingBuffer);
 
-    init_ringbuffer_kernel<<<1, 1>>>(d_ringbuf, gpu_buffer, NUM_CHUNKS);
+    init_ringbuffer_kernel<<<1, 1>>>(d_ringbuf, data_buffer, NUM_CHUNKS);
     cudaDeviceSynchronize();
 
     send_addr(sockfd);
