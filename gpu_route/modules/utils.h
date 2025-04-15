@@ -46,20 +46,6 @@
         }                                                                      \
     } while (0)
 
-// typedef struct {
-//     int gpu_id;
-//     ucp_context_h context;
-//     ucp_worker_h worker;
-//     ucp_ep_h ep;
-//     ucp_mem_h memh;
-//     void* gpu_buffer;
-//     size_t buffer_size;
-//     ucp_address_t* remote_worker_addr;
-//     size_t remote_worker_addr_len;
-//     uintptr_t* remote_buffer_addr;
-//     ucp_rkey_h remote_rkey;
-// } gpu_worker_t;
-
 // Basic socket send, loop to ensure full data transfer
 void socket_send(int sockfd, const void* data, size_t size) {
     size_t sent = 0;
@@ -103,76 +89,38 @@ void init(ucp_context_h context, ucp_worker_h worker)
     UCS_CHECK(ucp_worker_create(context, &worker_params, &worker));
 }
 
-// Exchange addresses of ucp workers and buffers and create an endpoint
-// void exchange_addresses(gpu_worker_t* local, int sockfd) 
-// {
-//     // Exchange the worker addresses
-//     ucp_address_t* local_worker_addr;
-//     size_t local_worker_len;
-//     UCS_CHECK(ucp_worker_get_address(local->worker, &local_worker_addr, &local_worker_len));
+void create_ep(int sockfd, ucp_ep_h * ep)
+{
+    ucp_address_t* local_worker_addr;
+    size_t local_worker_len;
+    UCS_CHECK(ucp_worker_get_address(local->worker, &local_worker_addr, &local_worker_len));
     
-//     uint64_t addr_header = *((uint64_t*)local_worker_addr);
-//     printf("Worker address: %p (%zu)\n", addr_header, local_worker_len);
+    uint64_t addr_header = *((uint64_t*)local_worker_addr);
+    printf("Worker address: %p (%zu)\n", addr_header, local_worker_len);
     
-//     // Send to remote worker
-//     socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
-//     socket_send(sockfd, local_worker_addr, local_worker_len);
+    // Send to remote worker
+    socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
+    socket_send(sockfd, local_worker_addr, local_worker_len);
 
-//     ucp_worker_release_address(local->worker, local_worker_addr);
+    ucp_worker_release_address(local->worker, local_worker_addr);
+
+    ucp_address_t* remote_worker_addr;
+    size_t remote_worker_len;
     
-//     socket_recv(sockfd, &local->remote_worker_addr_len, sizeof(local->remote_worker_addr_len));
-//     local->remote_worker_addr = (ucp_address_t*)malloc(local->remote_worker_addr_len);
-//     socket_recv(sockfd, local->remote_worker_addr, local->remote_worker_addr_len);
+    socket_recv(sockfd, &remote_worker_len, sizeof(remote_worker_len));
+    remote_worker_addr = (ucp_address_t*)malloc(remote_worker_len);
+    socket_recv(sockfd, remote_worker_addr, remote_worker_len);
 
-//     uint64_t remote_addr_header = *((uint64_t*)local->remote_worker_addr);
-//     printf("Worker address: %p (%zu)\n", remote_addr_header, local->remote_worker_addr_len);
+    uint64_t remote_addr_header = *((uint64_t*)remote_worker_addr);
+    printf("Remote worker address: %p (%zu)\n", remote_addr_header, remote_worker_len);
+
+    ucp_ep_params_t ep_params;
+    memset(&ep_params, 0, sizeof(ep_params));
     
-//     // Exchange the gpu buffers
-//     uintptr_t local_buf_addr = (uintptr_t)local->gpu_buffer;
-//     printf("Sending  local buffer address: %p\n", local_buf_addr);
-//     socket_send(sockfd, &local_buf_addr, sizeof(uintptr_t));
-//     socket_recv(sockfd, &local->remote_buffer_addr, sizeof(uintptr_t));
-//     printf("Received remote buffer address: %p\n", local->remote_buffer_addr);
+    ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
+    ep_params.address = remote_worker_addr;
 
-//     ucp_ep_params_t ep_params;
-//     memset(&ep_params, 0, sizeof(ep_params));
-    
-//     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
-//     ep_params.address = local->remote_worker_addr;
+    UCS_CHECK(ucp_ep_create(local->worker, &ep_params, &local->ep));
 
-//     UCS_CHECK(ucp_ep_create(local->worker, &ep_params, &local->ep));
-
-//     // Send rkey
-//     size_t rkey_size;
-//     void *rkey_buffer;
-//     UCS_CHECK(ucp_rkey_pack(local->context, local->memh, &rkey_buffer, &rkey_size));
-//     printf("Rkey send: %p %zu\n", rkey_buffer, rkey_size);
-//     socket_send(sockfd, &rkey_size, sizeof(rkey_size));
-//     socket_send(sockfd, rkey_buffer, rkey_size);
-//     ucp_rkey_buffer_release(rkey_buffer);
-
-//     // Receive rkey
-//     size_t remote_rkey_size;
-//     socket_recv(sockfd, &remote_rkey_size, sizeof(remote_rkey_size));
-//     void *remote_rkey_buffer = malloc(remote_rkey_size);
-//     socket_recv(sockfd, remote_rkey_buffer, remote_rkey_size);
-//     printf("Rkey recv: %p %zu\n", remote_rkey_buffer, remote_rkey_size);
-//     UCS_CHECK(ucp_ep_rkey_unpack(local->ep, remote_rkey_buffer, &local->remote_rkey));
-
-//     printf("Local rkey size: %zu, Remote rkey size: %zu\n", 
-//        rkey_size, remote_rkey_size);
-
-//     // free(rkey_buffer);
-//     free(remote_rkey_buffer);
-//     close(sockfd);
-// }
-
-// void gpu_worker_teardown(gpu_worker_t* worker) {
-//     if (worker->remote_rkey) ucp_rkey_destroy(worker->remote_rkey);
-//     if (worker->ep) ucp_ep_destroy(worker->ep);
-//     if (worker->memh) ucp_mem_unmap(worker->context, worker->memh);
-//     if (worker->worker) ucp_worker_destroy(worker->worker);
-//     if (worker->context) ucp_cleanup(worker->context);
-//     if (worker->remote_worker_addr) free(worker->remote_worker_addr);
-//     if (worker->gpu_buffer) cudaFree(worker->gpu_buffer);
-// }
+    print("Endpoint created.");
+}

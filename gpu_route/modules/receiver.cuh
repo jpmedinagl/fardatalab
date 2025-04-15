@@ -1,6 +1,8 @@
 #ifndef RECEIVER_H
 #define RECEIVER_H
 
+#include "ring.cuh"
+
 class Receiver {
 private:
     ucp_context_h context;
