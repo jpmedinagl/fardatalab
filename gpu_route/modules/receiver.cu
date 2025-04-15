@@ -9,6 +9,11 @@ __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_
     rb->init(buffer, num_chunks);
 }
 
+__global__ void dequeue_kernel(RingBuffer* rb, void* out_chunk, bool* success) 
+{
+    *success = rb->dequeue(out_chunk);
+}
+
 void Receiver::send_addr(int sockfd)
 {
     // 1. send key
@@ -23,7 +28,7 @@ void Receiver::send_addr(int sockfd)
     ucp_rkey_buffer_release(rkey_buffer);
 
     // 2. send ring buffer information
-    RingBufferRemoteInfo buf = d_ringbuf.export_metadata();
+    RingBufferRemoteInfo buf = d_ringbuf->export_metadata();
     socket_send(sockfd, &buf, sizeof(buf));        
 }
 
@@ -51,7 +56,7 @@ Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
     d_ringbuf = reinterpret_cast<RingBuffer*>(gpu_memory);
     void* data_buffer = reinterpret_cast<char*>(gpu_memory) + sizeof(RingBuffer);
 
-    init_ringbuffer_kernel<<<1, 1>>>(d_ringbuf, gpu_buffer, num_chunks);
+    init_ringbuffer_kernel<<<1, 1>>>(d_ringbuf, gpu_buffer, NUM_CHUNKS);
     cudaDeviceSynchronize();
 
     send_addr(sockfd);
@@ -66,10 +71,4 @@ void Receiver::dequeue(void* out_chunk)
     if (!success) {
         std::cout << "Buffer empty" << std::endl;
     }
-}
-
-// GPU kernel wrapper
-__global__ void dequeue_kernel(RingBuffer* rb, void* out_chunk, bool* success) 
-{
-    *success = rb->dequeue(out_chunk);
 }
