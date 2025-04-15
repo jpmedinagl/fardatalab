@@ -15,17 +15,6 @@ struct RingBufferRemoteInfo {
     size_t size;
 };
 
-RingBufferRemoteInfo export_metadata(const RingBuffer& rb) {
-    return {
-        reinterpret_cast<uintptr_t>(rb.buffer),
-        // &head,
-        reinterpret_cast<uintptr_t>(&rb.tail),
-        reinterpret_cast<uintptr_t>(rb.head),
-        reinterpret_cast<uintptr_t>(rb.tail),
-        rb.size
-    };
-};
-
 class RingBuffer {
 public:
     void * buffer;

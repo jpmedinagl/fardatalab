@@ -3,6 +3,17 @@
 #include <iostream>
 #include <new>
 
+RingBufferRemoteInfo export_metadata(const RingBuffer& rb) {
+    return {
+        reinterpret_cast<uintptr_t>(rb.buffer),
+        // &head,
+        reinterpret_cast<uintptr_t>(&rb.tail),
+        reinterpret_cast<uintptr_t>(rb.head),
+        reinterpret_cast<uintptr_t>(rb.tail),
+        rb.size
+    };
+};
+
 __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_chunks) 
 {
     // new (rb) RingBuffer(buffer, num_chunks);
