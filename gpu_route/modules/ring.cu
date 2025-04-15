@@ -6,7 +6,7 @@
 //     tail = buf;
 // }
 
-__device__ void init(void* buf, size_t num_chunks) {
+__device__ void RingBuffer::init(void* buf, size_t num_chunks) {
     buffer = buf;
     head = buf;
     tail = buf;
