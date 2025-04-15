@@ -27,11 +27,11 @@ public:
 
     RingBufferRemoteInfo export_metadata() const {
         return {
-            buffer,
+            reinterpret_cast<uintptr_t>(buffer),
             // &head,
-            &tail,
-            head,
-            tail,
+            reinterpret_cast<uintptr_t>(&tail),
+            reinterpret_cast<uintptr_t>(head),
+            reinterpret_cast<uintptr_t>(tail),
             size
         };
     };
