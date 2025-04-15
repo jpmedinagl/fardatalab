@@ -131,7 +131,7 @@ void Sender::remote_push(int gpu_id)
     void* tail_req = ucp_put_nbx(
         ep,
         &new_tail,
-        sizeof(size_t),
+        sizeof(void *),
         remote_tail_ptr,
         remote_rkey,
         &tail_params
