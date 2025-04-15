@@ -1,3 +1,6 @@
+#ifndef UTILS_H
+#define UTILS_H
+
 #include <ucp/api/ucp.h>
 #include <cuda_runtime.h>
 #include <ucs/memory/memory_type.h>
@@ -124,3 +127,5 @@ void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep)
 
     printf("Endpoint created.");
 }
+
+#endif // UTILS_H
