@@ -23,11 +23,11 @@ private:
     // ucp_address_t* remote_worker;
     ucp_rkey_h remote_rkey;
 
-    void * remote_buf;
+    uintptr_t remote_buf;
     // void ** remote_head_ptr;
-    void ** remote_tail_ptr;
-    void * remote_head;
-    void * remote_tail;
+    uintptr_t remote_tail_ptr;
+    uintptr_t remote_head;
+    uintptr_t remote_tail;
     size_t size;
 
     void process_req(void * request);

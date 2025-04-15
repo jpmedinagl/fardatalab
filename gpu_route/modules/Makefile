@@ -9,10 +9,10 @@ LIBS = -lucp -lucs -lcudart
 
 all: peer1 peer2
 
-peer1: peer1.cu utils.h sender.cu sender.cuh ring.cuh
+peer1: peer1.cu utils.h sender.cu sender.cuh ring.cuh ring.cu
 	$(NVCC) -o $@ $< sender.cu ring.cu $(UCX_CPPFLAGS) $(UCX_LDFLAGS) $(LIBS)
 
-peer2: peer2.cu utils.h receiver.cu receiver.cuh ring.cuh
+peer2: peer2.cu utils.h receiver.cu receiver.cuh ring.cuh ring.cu
 	$(NVCC) -o $@ $< receiver.cu ring.cu $(UCX_CPPFLAGS) $(UCX_LDFLAGS) $(LIBS)
 
 

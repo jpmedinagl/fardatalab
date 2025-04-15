@@ -97,11 +97,10 @@ void Sender::remote_push(int gpu_id)
     // fetch the current head ? and check the count ?
 
     // 1. new tail position
-    uintptr_t new_offset = ((uintptr_t)remote_tail - 
-                            (uintptr_t)remote_buf + CHUNK_SIZE) %
+    uintptr_t new_offset = (remote_tail - remote_buf + CHUNK_SIZE) %
                             (size * CHUNK_SIZE);
     
-    void* new_tail = (void*)((uintptr_t)remote_buf + new_offset);
+    void* new_tail = (void*)(remote_buf + new_offset);
 
     // 2. update REMOTE tail pointer first
     ucp_request_param_t tail_params = {
@@ -113,7 +112,7 @@ void Sender::remote_push(int gpu_id)
         ep,
         &new_tail,
         sizeof(size_t),
-        (uintptr_t)remote_tail_ptr,
+        remote_tail_ptr,
         remote_rkey,
         &tail_params
     );
@@ -129,12 +128,12 @@ void Sender::remote_push(int gpu_id)
         ep,
         local_head,
         CHUNK_SIZE,
-        (uintptr_t)remote_tail,
+        remote_tail,
         remote_rkey,
         &put_params
     );
     process_req(put_req);
 
     // 4. update local reference of the tail
-    remote_tail = new_tail;
+    remote_tail = (uintptr_t)new_tail;
 }
