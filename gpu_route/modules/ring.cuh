@@ -25,71 +25,64 @@ public:
 
     // RingBuffer(void * buf, size_t num_chunks);
 
-    RingBufferRemoteInfo export_metadata() const;
-    //  {
-    //     return {
-    //         buffer,
-    //         // &head,
-    //         &tail,
-    //         head,
-    //         tail,
-    //         size
-    //     };
-    // };
+    RingBufferRemoteInfo export_metadata() const {
+        return {
+            buffer,
+            // &head,
+            &tail,
+            head,
+            tail,
+            size
+        };
+    };
 
-    __device__ void init(void* buf, size_t num_chunks);
-    //  {
-    //     buffer = buf;
-    //     head = buf;
-    //     tail = buf;
-    //     size = num_chunks + 1;
-    //     count = 0;
-    // };
+    __device__ void init(void* buf, size_t num_chunks) {
+        buffer = buf;
+        head = buf;
+        tail = buf;
+        size = num_chunks + 1;
+        count = 0;
+    };
 
-    __device__ bool is_empty() const;
-    //  {
-    //     return count == 0;
-    // };
+    __device__ bool is_empty() const {
+        return count == 0;
+    };
 
-    __device__ bool is_full() const;
-    //  {
-    //     return count == size;
-    // };
+    __device__ bool is_full() const {
+        return count == size;
+    };
 
-    __device__ bool enqueue(const void * chunk);
-    // {
-    //     if (is_full()) {
-    //         return false;
-    //     }
+    __device__ bool enqueue(const void * chunk) {
+        if (is_full()) {
+            return false;
+        }
 
-    //     memcpy(tail, chunk, CHUNK_SIZE);
+        memcpy(tail, chunk, CHUNK_SIZE);
 
-    //     uintptr_t offset = (reinterpret_cast<uintptr_t>(tail) - 
-    //                         reinterpret_cast<uintptr_t>(buffer) + CHUNK_SIZE) % 
-    //                         (size * CHUNK_SIZE);
-    //     tail = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + offset);
+        uintptr_t offset = (reinterpret_cast<uintptr_t>(tail) - 
+                            reinterpret_cast<uintptr_t>(buffer) + CHUNK_SIZE) % 
+                            (size * CHUNK_SIZE);
+        tail = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + offset);
 
-    //     count--;
-    //     return true;
-    // };
+        count--;
+        return true;
+    };
 
+    __device__ bool dequeue(void* out_chunk) {
+        if (is_empty()) {
+            return false;
+        }
 
-    __device__ bool dequeue(void* out_chunk);
-    // {
-    //     if (is_empty()) {
-    //         return false;
-    //     }
+        memcpy(out_chunk, head, CHUNK_SIZE);
 
-    //     memcpy(out_chunk, head, CHUNK_SIZE);
+        uintptr_t offset = (reinterpret_cast<uintptr_t>(head) - 
+                            reinterpret_cast<uintptr_t>(buffer) + CHUNK_SIZE) 
+                            % (size * CHUNK_SIZE);
+        head = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + offset);
 
-    //     uintptr_t offset = (reinterpret_cast<uintptr_t>(head) - 
-    //                         reinterpret_cast<uintptr_t>(buffer) + CHUNK_SIZE) 
-    //                         % (size * CHUNK_SIZE);
-    //     head = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + offset);
-
-    //     count--;
-    //     return true;
-    // };
+        count--;
+        return true;
+    };
 };
 
 #endif // RING_BUFFER_H
