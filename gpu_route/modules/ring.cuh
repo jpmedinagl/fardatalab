@@ -90,6 +90,6 @@ public:
     //     count--;
     //     return true;
     // };
-}
+};
 
 #endif // RING_BUFFER_H
