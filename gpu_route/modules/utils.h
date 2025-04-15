@@ -20,7 +20,7 @@
 
 #include <stdio.h>
 
-#define NUM_CHUNKS 10
+#define NUM_CHUNKS 1 //0
 #define PORT 12345
 
 #define CHECK_ERROR(_cond, _msg)                                               \

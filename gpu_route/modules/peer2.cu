@@ -39,7 +39,7 @@ int main()
 
     sleep(5);
 
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < NUM_CHUNKS; i++) {
         void * out_chunk;
         cudaMalloc(&out_chunk, CHUNK_SIZE);
 

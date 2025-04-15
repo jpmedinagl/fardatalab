@@ -19,7 +19,7 @@ peer2: peer2.o receiver.o utils.o
 	$(NVCC) -c -o $@ $< $(UCX_CPPFLAGS)
 
 clean:
-	rm -f peer1 peer2
+	rm -f peer1 peer2 *.o
 
 check-ucx:
 	@echo "=== Checking UCX Library Path ==="

@@ -54,12 +54,12 @@ int main()
 
     printf("Sender connected\n\n");
 
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < NUM_CHUNKS; i++) {
         sender.push(gpu_chunks[i], CHUNK_SIZE);
         printf("Enqueued chunk %d\n", i);
     }
 
-    for (int i = 0; i < 1; i++) {
+    for (int i = 0; i < NUM_CHUNKS; i++) {
         sender.remote_push(1);
         printf("Sent chunk %d\n", i);
     }
