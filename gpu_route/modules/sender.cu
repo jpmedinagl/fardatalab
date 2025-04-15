@@ -8,7 +8,7 @@ __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_
 }
 
 __global__ void push_kernel(RingBuffer* rb, void* data, size_t size, bool* success) {
-    *success = rb->enqueue(data, CHUNK_SIZE);
+    *success = rb->enqueue(data); //, CHUNK_SIZE);
 }
 
 __global__ void get_head_kernel(RingBuffer* rb, void** head) {
@@ -116,7 +116,7 @@ void Sender::remote_push(int gpu_id)
         remote_rkey,
         &tail_params
     );
-    process_request(tail_req);
+    process_req(tail_req);
 
     // 3. write data to old tail position
     ucp_request_param_t put_params = {
