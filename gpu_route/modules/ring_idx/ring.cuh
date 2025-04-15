@@ -46,10 +46,9 @@ public:
             return false;
         }
 
-        memcpy(reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + tail), chunk, CHUNK_SIZE);
+        memcpy(buffer + tail, chunk, CHUNK_SIZE);
 
-        uintptr_t offset = (reinterpret_cast<uintptr_t>(tail) - reinterpret_cast<uintptr_t>(buffer) + CHUNK_SIZE) % (size * CHUNK_SIZE);
-        tail = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + offset);
+        tail = (tail + CHUNK_SIZE) % (size * CHUNK_SIZE);
 
         count++;
 
@@ -63,11 +62,10 @@ public:
         //     return false;
         // }
 
-        memcpy(out_chunk, reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + head), CHUNK_SIZE);
+        memcpy(out_chunk, buffer + head, CHUNK_SIZE);
 
-        uintptr_t offset = (reinterpret_cast<uintptr_t>(head) - reinterpret_cast<uintptr_t>(buffer) + CHUNK_SIZE) % (size * CHUNK_SIZE);
-        head = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(buffer) + offset);
-
+        head = (head + CHUNK_SIZE) % (size * CHUNK_SIZE);
+    
         count--;
 
         printf("Buffer status: head = %zu, tail = %zu, count = %zu\n", head, tail, count);
