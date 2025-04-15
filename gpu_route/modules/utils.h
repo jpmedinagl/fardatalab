@@ -89,11 +89,11 @@ void init(ucp_context_h context, ucp_worker_h worker)
     UCS_CHECK(ucp_worker_create(context, &worker_params, &worker));
 }
 
-void create_ep(int sockfd, ucp_ep_h * ep)
+void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep)
 {
     ucp_address_t* local_worker_addr;
     size_t local_worker_len;
-    UCS_CHECK(ucp_worker_get_address(local->worker, &local_worker_addr, &local_worker_len));
+    UCS_CHECK(ucp_worker_get_address(worker, &local_worker_addr, &local_worker_len));
     
     uint64_t addr_header = *((uint64_t*)local_worker_addr);
     printf("Worker address: %p (%zu)\n", addr_header, local_worker_len);
@@ -102,7 +102,7 @@ void create_ep(int sockfd, ucp_ep_h * ep)
     socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
     socket_send(sockfd, local_worker_addr, local_worker_len);
 
-    ucp_worker_release_address(local->worker, local_worker_addr);
+    ucp_worker_release_address(worker, local_worker_addr);
 
     ucp_address_t* remote_worker_addr;
     size_t remote_worker_len;
@@ -120,7 +120,7 @@ void create_ep(int sockfd, ucp_ep_h * ep)
     ep_params.field_mask = UCP_EP_PARAM_FIELD_REMOTE_ADDRESS;
     ep_params.address = remote_worker_addr;
 
-    UCS_CHECK(ucp_ep_create(local->worker, &ep_params, &local->ep));
+    UCS_CHECK(ucp_ep_create(worker, &ep_params, &ep));
 
-    print("Endpoint created.");
+    printf("Endpoint created.");
 }
