@@ -5,7 +5,8 @@
 
 __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_chunks) 
 {
-    new (rb) RingBuffer(buffer, num_chunks);
+    // new (rb) RingBuffer(buffer, num_chunks);
+    rb->init(buffer, num_chunks);
 }
 
 void Receiver::send_addr(int sockfd)

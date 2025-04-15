@@ -4,7 +4,8 @@
 
 __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_chunks) 
 {
-    new (rb) RingBuffer(buffer, num_chunks);
+    // new (rb) RingBuffer(buffer, num_chunks);
+    rb->init(buffer, num_chunks);
 }
 
 __global__ void push_kernel(RingBuffer* rb, void* data, size_t size, bool* success) {
