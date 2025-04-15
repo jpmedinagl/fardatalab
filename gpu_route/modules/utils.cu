@@ -59,7 +59,7 @@ void create_ep(int sockfd, ucp_worker_h worker, ucp_ep_h * ep)
     socket_send(sockfd, &local_worker_len, sizeof(local_worker_len));
     socket_send(sockfd, local_worker_addr, local_worker_len);
 
-    UCS_CHECK(ucp_worker_release_address(worker, local_worker_addr));
+    ucp_worker_release_address(worker, local_worker_addr);
 
     ucp_address_t* remote_worker_addr;
     size_t remote_worker_len;

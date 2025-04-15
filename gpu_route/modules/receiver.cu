@@ -25,11 +25,17 @@ void Receiver::send_addr(int sockfd)
 
     socket_send(sockfd, &rkey_size, sizeof(rkey_size));
     socket_send(sockfd, rkey_buffer, rkey_size);
-    UCS_CHECK(ucp_rkey_buffer_release(rkey_buffer));
+    ucp_rkey_buffer_release(rkey_buffer);
 
     // 2. send ring buffer information
-    RingBufferRemoteInfo buf = d_ringbuf->export_metadata();
-    socket_send(sockfd, &buf, sizeof(buf));        
+    RingBuffer host_rb;
+    cudaMemcpy(&host_rb, d_ringbuf, sizeof(RingBuffer), cudaMemcpyDeviceToHost);
+
+    RingBufferRemoteInfo meta = export_ringbuffer_metadata(host_rb);
+
+    printf("sending info...\n");
+    socket_send(sockfd, &meta, sizeof(meta));
+    printf("info sent...\n");
 }
 
 Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,

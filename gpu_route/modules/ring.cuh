@@ -15,6 +15,17 @@ struct RingBufferRemoteInfo {
     size_t size;
 };
 
+RingBufferRemoteInfo export_metadata(const RingBuffer& rb) {
+    return {
+        reinterpret_cast<uintptr_t>(rb.buffer),
+        // &head,
+        reinterpret_cast<uintptr_t>(&rb.tail),
+        reinterpret_cast<uintptr_t>(rb.head),
+        reinterpret_cast<uintptr_t>(rb.tail),
+        rb.size
+    };
+};
+
 class RingBuffer {
 public:
     void * buffer;
@@ -24,17 +35,6 @@ public:
     size_t count;
 
     // RingBuffer(void * buf, size_t num_chunks);
-
-    RingBufferRemoteInfo export_metadata() const {
-        return {
-            reinterpret_cast<uintptr_t>(buffer),
-            // &head,
-            reinterpret_cast<uintptr_t>(&tail),
-            reinterpret_cast<uintptr_t>(head),
-            reinterpret_cast<uintptr_t>(tail),
-            size
-        };
-    };
 
     __device__ void init(void* buf, size_t num_chunks) {
         buffer = buf;
