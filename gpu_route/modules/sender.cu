@@ -137,7 +137,7 @@ void Sender::remote_push(int gpu_id)
 
     printf("old tail: %p\n", remote_tail);
     printf("new tail: %p\n", new_tail);
-    printf("updated tail ptr: %p\n", remote_tail_ptr);
+    printf("tail ptr: %p\n", remote_tail_ptr);
 
     // 2. update REMOTE tail pointer first
     ucp_request_param_t tail_params = {
@@ -154,10 +154,11 @@ void Sender::remote_push(int gpu_id)
         &tail_params
     );
     process_req(tail_req);
-
+    ucp_request_check_status(tail_req);
     printf("tail written\n");
 
-    // DEBUG: CHECK VALUE OF TAIL
+    // DEBUG: CHECK VALUE OF TAIL -> for some reason this value isn't the correct
+    // updated value ....
     
     ucp_request_param_t get_params = {
         .op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE,
@@ -166,12 +167,13 @@ void Sender::remote_push(int gpu_id)
     void *get_req = ucp_get_nbx(
         ep,
         tmp_debug,
-        sizeof(void *),      // Size of data (pointer)
-        remote_tail_ptr,        // Remote address for the tail pointer
-        remote_rkey,            // Remote key for access
-        &get_params             // Additional params
+        sizeof(void *),
+        remote_tail_ptr,
+        remote_rkey,
+        &get_params
     );
     process_req(get_req);
+    ucp_request_check_status(tail_req);
 
     printf("get tail: %p\n", (void*)tmp_debug);
 
