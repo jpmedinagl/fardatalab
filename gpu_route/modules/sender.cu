@@ -1,8 +1,18 @@
 #include "sender.cuh"
 
+#include <new>
+
 __global__ void init_ringbuffer_kernel(RingBuffer* rb, void* buffer, size_t num_chunks) 
 {
     new (rb) RingBuffer(buffer, num_chunks);
+}
+
+__global__ void push_kernel(RingBuffer* rb, void* data, size_t size, bool* success) {
+    *success = rb->enqueue(data, CHUNK_SIZE);
+}
+
+__global__ void get_head_kernel(RingBuffer* rb, void** head) {
+    *head = rb->head;
 }
 
 void Sender::recv_addr(int sockfd)
@@ -44,7 +54,7 @@ Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockf
     init_ringbuffer_kernel<<<1, 1>>>(this->d_ringbuf, data_buffer, NUM_CHUNKS);
     cudaDeviceSynchronize();
 
-    recv_addr(sockfd)
+    recv_addr(sockfd);
 }
 
 void Sender::process_req(void* request) 
@@ -75,7 +85,7 @@ void Sender::remote_push(int gpu_id)
 {   
     (void *) gpu_id;
     if (!remote_tail || !remote_head) {
-        std::cerr << "Remote head or tail is null. Cannot enqueue data." << std::endl;
+        printf("Remote head or tail is null. Cannot enqueue data.\n");
     }
 
     // 0. get the data we are sending from our local send buffer
@@ -126,12 +136,4 @@ void Sender::remote_push(int gpu_id)
 
     // 4. update local reference of the tail
     remote_tail = new_tail;
-}
-
-__global__ void push_kernel(RingBuffer* rb, void* data, size_t size, bool* success) {
-    *success = rb->enqueue(data, size);
-}
-
-__global__ void get_head_kernel(RingBuffer* rb, void** head) {
-    *head = rb->head;
 }

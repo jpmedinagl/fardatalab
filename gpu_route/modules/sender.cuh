@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 
+#include "utils.h"
 #include "ring.cuh"
 
 class Sender {
