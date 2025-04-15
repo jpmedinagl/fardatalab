@@ -40,6 +40,13 @@ void Sender::recv_addr(int sockfd)
     remote_head = buf.head_addr;
     remote_tail = buf.tail_addr;
     size = buf.size;
+
+    printf("\nRemote ring buffer info:\n");
+    printf("buf: %p\n", remote_buf);
+    printf("tail_ptr: %p\n", remote_tail_ptr);
+    printf("head: %p\n", remote_head);
+    printf("tail: %p\n", remote_tail);
+    printf("size: %p\n", size);
 }
 
 Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockfd)
@@ -113,6 +120,7 @@ void Sender::remote_push(int gpu_id)
 
     printf("old tail: %p\n", remote_tail);
     printf("new tail: %p\n", new_tail);
+    printf("updated tail ptr: %p\n", remote_tail_ptr);
 
     // 2. update REMOTE tail pointer first
     ucp_request_param_t tail_params = {
@@ -148,7 +156,7 @@ void Sender::remote_push(int gpu_id)
     );
     process_req(put_req);
 
-    print("data placed\n");
+    printf("data placed\n");
 
     // 4. update local reference of the tail
     remote_tail = (uintptr_t)new_tail;

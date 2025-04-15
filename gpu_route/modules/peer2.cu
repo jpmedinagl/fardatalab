@@ -35,11 +35,11 @@ int main()
 
     Receiver receiver(context, worker, ep, sockfd);
 
-    printf("Receiver connected\n");
+    printf("Receiver connected\n\n");
 
     sleep(5);
 
-    for (int i = 0; i < NUM_CHUNKS; i++) {
+    for (int i = 0; i < 1; i++) {
         void * out_chunk;
         cudaMalloc(&out_chunk, CHUNK_SIZE);
 
@@ -47,6 +47,7 @@ int main()
 
         char host_data[CHUNK_SIZE + 1] = {0};
         cudaMemcpy(host_data, out_chunk, CHUNK_SIZE, cudaMemcpyDeviceToHost);
+
         printf("Received chunk %d: %s\n", i, host_data);
 
         cudaFree(out_chunk);

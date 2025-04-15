@@ -58,9 +58,9 @@ public:
     };
 
     __device__ bool dequeue(void* out_chunk) {
-        if (is_empty()) {
-            return false;
-        }
+        // if (is_empty()) {
+        //     return false;
+        // }
 
         memcpy(out_chunk, head, CHUNK_SIZE);
 

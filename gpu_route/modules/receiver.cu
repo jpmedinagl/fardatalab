@@ -25,6 +25,18 @@ __global__ void dequeue_kernel(RingBuffer* rb, void* out_chunk, bool* success)
     *success = rb->dequeue(out_chunk);
 }
 
+__global__ void get_head_kernel(RingBuffer* rb, void** head) {
+    *head = rb->head;
+}
+
+__global__ void get_tail_kernel(RingBuffer* rb, void** tail) {
+    *tail = rb->tail;
+}
+
+__global__ void get_tail_ptr_kernel(RingBuffer* rb, void*** tail_ptr) {
+    *tail_ptr = &(rb->tail);
+}
+
 void Receiver::send_addr(int sockfd)
 {
     // 1. send key
@@ -44,6 +56,13 @@ void Receiver::send_addr(int sockfd)
 
     RingBufferRemoteInfo meta = export_metadata(host_rb);
     socket_send(sockfd, &meta, sizeof(meta));
+
+    printf("Local ring buffer info:\n");
+    printf("buf: %p\n", meta.buffer_addr);
+    printf("tail_ptr: %p\n", meta.tail_addr_ptr);
+    printf("head: %p\n", meta.head_addr);
+    printf("tail: %p\n", meta.tail_addr);
+    printf("size: %p\n\n", meta.size);
 }
 
 Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
@@ -78,6 +97,31 @@ Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,
 
 void Receiver::dequeue(void* out_chunk) 
 {
+    void* local_head;
+    void* local_tail;
+    void** local_tail_ptr;
+
+    // Launch the kernel to get the head and tail pointers
+    get_head_kernel<<<1, 1>>>(d_ringbuf, &local_head);
+    get_tail_kernel<<<1, 1>>>(d_ringbuf, &local_tail);
+    get_tail_ptr_kernel<<<1, 1>>>(d_ringbuf, &local_tail_ptr);
+
+    // Synchronize to ensure the kernel execution completes
+    cudaDeviceSynchronize();
+
+    // Now copy the head and tail pointers from device to host
+    void* local_head_host;
+    void* local_tail_host;
+    void** local_tail_ptr_host;
+    cudaMemcpy(&local_head_host, &local_head, sizeof(void*), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&local_tail_host, &local_tail, sizeof(void*), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&local_tail_ptr_host, &local_tail_ptr, sizeof(void**), cudaMemcpyDeviceToHost);
+
+    // Print the head and tail pointers
+    printf("Receiver head pointer (host-side): %p\n", local_head_host);
+    printf("Receiver tail pointer (host-side): %p\n", local_tail_host);
+    printf("Receiver tail pointer ptr (host-side): %p\n", local_tail_ptr_host);
+
     // dequeue from ring buffer
     bool success = false;
     dequeue_kernel<<<1, 1>>>(d_ringbuf, out_chunk, &success);
@@ -85,4 +129,18 @@ void Receiver::dequeue(void* out_chunk)
     if (!success) {
         std::cout << "Buffer empty" << std::endl;
     }
+
+    get_head_kernel<<<1, 1>>>(d_ringbuf, &local_head);
+    get_tail_kernel<<<1, 1>>>(d_ringbuf, &local_tail);
+
+    // Synchronize to ensure the kernel execution completes
+    cudaDeviceSynchronize();
+
+    // Now copy the head and tail pointers from device to host
+    cudaMemcpy(&local_head_host, &local_head, sizeof(void*), cudaMemcpyDeviceToHost);
+    cudaMemcpy(&local_tail_host, &local_tail, sizeof(void*), cudaMemcpyDeviceToHost);
+
+    // Print the head and tail pointers
+    printf("Receiver head pointer (host-side): %p\n", local_head_host);
+    printf("Receiver tail pointer (host-side): %p\n", local_tail_host);
 }
