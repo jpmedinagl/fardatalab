@@ -42,11 +42,8 @@ void Receiver::send_addr(int sockfd)
     RingBuffer host_rb;
     cudaMemcpy(&host_rb, d_ringbuf, sizeof(RingBuffer), cudaMemcpyDeviceToHost);
 
-    RingBufferRemoteInfo meta = export_ringbuffer_metadata(host_rb);
-
-    printf("sending info...\n");
+    RingBufferRemoteInfo meta = export_metadata(host_rb);
     socket_send(sockfd, &meta, sizeof(meta));
-    printf("info sent...\n");
 }
 
 Receiver::Receiver(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint,

@@ -37,18 +37,20 @@ int main()
 
     printf("Receiver connected\n");
 
-    // for (int i = 0; i < NUM_CHUNKS; i++) {
-    //     void * out_chunk;
-    //     cudaMalloc(&out_chunk, CHUNK_SIZE);
+    sleep(5);
 
-    //     receiver.dequeue(out_chunk);
+    for (int i = 0; i < NUM_CHUNKS; i++) {
+        void * out_chunk;
+        cudaMalloc(&out_chunk, CHUNK_SIZE);
 
-    //     char host_data[CHUNK_SIZE + 1] = {0};
-    //     cudaMemcpy(host_data, out_chunk, CHUNK_SIZE, cudaMemcpyDeviceToHost);
-    //     printf("Received chunk %d: %s\n", i, host_data);
+        receiver.dequeue(out_chunk);
 
-    //     cudaFree(out_chunk);
-    // }
+        char host_data[CHUNK_SIZE + 1] = {0};
+        cudaMemcpy(host_data, out_chunk, CHUNK_SIZE, cudaMemcpyDeviceToHost);
+        printf("Received chunk %d: %s\n", i, host_data);
+
+        cudaFree(out_chunk);
+    }
 
     return 0;
 }
