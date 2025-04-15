@@ -25,7 +25,13 @@ public:
 
     // RingBuffer(void * buf, size_t num_chunks);
 
-    __device__ void init(void* buf, size_t num_chunks);
+    __device__ void init(void* buf, size_t num_chunks) {
+        buffer = buf;
+        head = buf;
+        tail = buf;
+        size = num_chunks + 1;
+        count = 0;
+    }
 
     RingBufferRemoteInfo export_metadata() const;
 

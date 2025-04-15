@@ -6,13 +6,13 @@
 //     tail = buf;
 // }
 
-__device__ void RingBuffer::init(void* buf, size_t num_chunks) {
-    buffer = buf;
-    head = buf;
-    tail = buf;
-    size = num_chunks + 1;
-    count = 0;
-}
+// __device__ void RingBuffer::init(void* buf, size_t num_chunks) {
+//     buffer = buf;
+//     head = buf;
+//     tail = buf;
+//     size = num_chunks + 1;
+//     count = 0;
+// }
 
 RingBufferRemoteInfo RingBuffer::export_metadata() const {
     return {
