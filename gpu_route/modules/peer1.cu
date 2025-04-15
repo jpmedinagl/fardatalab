@@ -13,11 +13,13 @@ int main()
     
     // Socket setup
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    struct sockaddr_in addr = {
-        .sin_family = AF_INET,
-        .sin_port = htons(PORT),
-        .sin_addr.s_addr = inet_addr("127.0.0.1")
-    };
+    
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(PORT);
+    addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+
     if (connect(sockfd, (struct sockaddr*)&addr, sizeof(addr))) {
         perror("connect failed");
         exit(1);
