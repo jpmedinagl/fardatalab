@@ -6,7 +6,6 @@ int main()
     ucp_context_h context;
     ucp_worker_h worker;
     ucp_ep_h ep;
-    ucp_mem_h memh;
 
     CUDA_CHECK(cudaSetDevice(0));
 
@@ -28,9 +27,9 @@ int main()
     // this is done for testing only
     // can I assume that the endpoints are created + keys are exchanged ?
 
-    // create ep + exchange
+    // create ep
 
-
+    create_ep(sockfd, &ep);
 
     // define different chunks to send
     void* gpu_chunks[NUM_CHUNKS];
@@ -44,20 +43,22 @@ int main()
         cudaMemcpy(gpu_chunks[i], host_data, CHUNK_SIZE, cudaMemcpyHostToDevice);
     }
 
-
     // now everything is setup, can create sender module
 
-    Sender sender(context, worker, ep, memh, remote_worker, remote_rkey);
+    // Sender sender(context, worker, ep, memh, remote_worker, remote_rkey);
+    Sender sender(context, worker, ep, sockfd);
 
-    for (int i = 0; i < NUM_CHUNKS; i++) {
-        sender.push(gpu_chunks[i], CHUNK_SIZE);
-        printf("Enqueued chunk %d\n", i);
-    }
+    printf("Sender connected\n");
+    
+    // for (int i = 0; i < NUM_CHUNKS; i++) {
+    //     sender.push(gpu_chunks[i], CHUNK_SIZE);
+    //     printf("Enqueued chunk %d\n", i);
+    // }
 
-    for (int i = 0; i < NUM_CHUNKS; i++) {
-        sender.remote_push(1);
-        printf("Sent chunk %d\n", i);
-    }
+    // for (int i = 0; i < NUM_CHUNKS; i++) {
+    //     sender.remote_push(1);
+    //     printf("Sent chunk %d\n", i);
+    // }
 
     return 0;
 }

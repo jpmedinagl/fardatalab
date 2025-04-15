@@ -6,9 +6,8 @@ int main()
     ucp_context_h context;
     ucp_worker_h worker;
     ucp_ep_h ep;
-    ucp_mem_h memh;
 
-    CUDA_CHECK(cudaSetDevice(0));
+    CUDA_CHECK(cudaSetDevice(1));
 
     init(context, worker);
     
@@ -29,24 +28,24 @@ int main()
 
     // exchange addresses + keys!
 
+    create_ep(sockfd, &ep);
 
-    
+    Receiver receiver(context, worker, ep, sockfd);
 
+    printf("Receiver connected\n");
 
-    Receiver receiver(context, worker, ep, memh);
+    // for (int i = 0; i < NUM_CHUNKS; i++) {
+    //     void * out_chunk;
+    //     cudaMalloc(&out_chunk, CHUNK_SIZE);
 
-    for (int i = 0; i < NUM_CHUNKS; i++) {
-        void * out_chunk;
-        cudaMalloc(&out_chunk, CHUNK_SIZE);
+    //     receiver.dequeue(out_chunk);
 
-        receiver.dequeue(out_chunk);
+    //     char host_data[CHUNK_SIZE + 1] = {0};
+    //     cudaMemcpy(host_data, out_chunk, CHUNK_SIZE, cudaMemcpyDeviceToHost);
+    //     printf("Received chunk %d: %s\n", i, host_data);
 
-        char host_data[CHUNK_SIZE + 1] = {0};
-        cudaMemcpy(host_data, out_chunk, CHUNK_SIZE, cudaMemcpyDeviceToHost);
-        printf("Received chunk %d: %s\n", i, host_data);
-
-        cudaFree(out_chunk);
-    }
+    //     cudaFree(out_chunk);
+    // }
 
     return 0;
 }
