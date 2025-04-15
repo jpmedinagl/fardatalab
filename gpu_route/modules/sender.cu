@@ -49,23 +49,6 @@ void Sender::recv_addr(int sockfd)
     printf("size: %p\n", size);
 }
 
-void Sender::send_addr(int sockfd)
-{
-    // 1. send key
-    size_t rkey_size;
-    void *rkey_buffer;
-    UCS_CHECK(ucp_rkey_pack(context, memh, &rkey_buffer, &rkey_size));
-    
-    printf("Rkey send: %p %zu\n", rkey_buffer, rkey_size);
-
-    socket_send(sockfd, &rkey_size, sizeof(rkey_size));
-    socket_send(sockfd, rkey_buffer, rkey_size);
-    ucp_rkey_buffer_release(rkey_buffer);
-
-    // 2. send tmp_debug pointer
-    socket_send(sockfd, &tmp_debug, sizeof(tmp_debug));
-}
-
 Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockfd)
     : context(ctx), worker(wrk), ep(endpoint)
 {
@@ -93,8 +76,10 @@ Sender::Sender(ucp_context_h ctx, ucp_worker_h wrk, ucp_ep_h endpoint, int sockf
     };
     UCS_CHECK(ucp_mem_map(context, &params, &memh));
 
+    // ucp_rkey_h tmp_debug_rkey;
+    // status = ucp_rkey_pack(context, memh, &tmp_debug_rkey);
+
     recv_addr(sockfd);
-    send_addr(sockfd);
 }
 
 void Sender::process_req(void* request) 
@@ -180,7 +165,7 @@ void Sender::remote_push(int gpu_id)
     };
     void *get_req = ucp_get_nbx(
         ep,
-        &tmp_debug,
+        tmp_debug,
         sizeof(void *),      // Size of data (pointer)
         remote_tail_ptr,        // Remote address for the tail pointer
         remote_rkey,            // Remote key for access
