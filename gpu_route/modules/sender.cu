@@ -112,34 +112,6 @@ void Sender::remote_push(int gpu_id)
 
     // fetch the current head ? and check the count ?
 
-    // 1. new tail position
-    uintptr_t new_offset = (remote_tail - remote_buf + CHUNK_SIZE) %
-                            (size * CHUNK_SIZE);
-    
-    void* new_tail = (void*)(remote_buf + new_offset);
-
-    printf("old tail: %p\n", remote_tail);
-    printf("new tail: %p\n", new_tail);
-    printf("updated tail ptr: %p\n", remote_tail_ptr);
-
-    // 2. update REMOTE tail pointer first
-    ucp_request_param_t tail_params = {
-        .op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE,
-        .memory_type = UCS_MEMORY_TYPE_CUDA
-    };
-    
-    void* tail_req = ucp_put_nbx(
-        ep,
-        &new_tail,
-        sizeof(void *),
-        remote_tail_ptr,
-        remote_rkey,
-        &tail_params
-    );
-    process_req(tail_req);
-
-    printf("tail written\n");
-
     // 3. write data to old tail position
     ucp_request_param_t put_params = {
         .op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE,
@@ -157,6 +129,34 @@ void Sender::remote_push(int gpu_id)
     process_req(put_req);
 
     printf("data placed\n");
+
+    // 1. new tail position
+    uintptr_t new_offset = (remote_tail - remote_buf + CHUNK_SIZE) %
+                            (size * CHUNK_SIZE);
+    
+    void* new_tail = (void*)(remote_buf + new_offset);
+
+    printf("updated tail ptr: %p\n", remote_tail_ptr);
+    printf("old tail: %p\n", remote_tail);
+    printf("new tail: %p\n", new_tail);
+
+    // 2. update REMOTE tail pointer first
+    ucp_request_param_t tail_params = {
+        .op_attr_mask = UCP_OP_ATTR_FIELD_MEMORY_TYPE,
+        .memory_type = UCS_MEMORY_TYPE_CUDA
+    };
+    
+    void* tail_req = ucp_put_nbx(
+        ep,
+        &new_tail,
+        sizeof(void **),
+        remote_tail_ptr,
+        remote_rkey,
+        &tail_params
+    );
+    process_req(tail_req);
+
+    printf("tail written\n");
 
     // 4. update local reference of the tail
     remote_tail = (uintptr_t)new_tail;
